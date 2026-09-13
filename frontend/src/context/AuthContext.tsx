@@ -1,110 +1,109 @@
 // src/context/AuthContext.tsx
 //
-// Auth state for the app. The access token itself lives in axios.ts's
-// in-memory store, not here — this context wraps it with the React state
-// components actually consume (current user, loading, auth actions) and
-// handles the one-time "am I already logged in?" check on app boot.
+// In-memory mock authentication context for Campus Bazaar.
+// Stores the active student user session in localStorage, with email validation,
+// demo student account switching, and logout capabilities.
 
 import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
+  useEffect,
   type ReactNode,
 } from 'react';
-import {
-  axiosInstance,
-  setAccessToken,
-  AUTH_LOGOUT_EVENT,
-} from '../api/axios';
-import type { LoginResponse, User } from '../types/api';
+import type { User } from '../types/market';
+import { INITIAL_USERS } from '../data/mockMarketData';
 
 interface AuthContextValue {
   user: User | null;
   isAuthenticated: boolean;
-  /** True until the initial boot-time hydration check has finished. */
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string) => Promise<boolean>;
+  switchUser: (userId: string) => void;
   logout: () => Promise<void>;
+  demoUsers: User[];
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const AUTH_STORAGE_KEY = 'campus_bazaar_active_user_v2';
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // On app boot there is no access token in memory yet — a hard reload
-  // wipes it, by design. If the user has a valid refresh cookie, calling
-  // any protected endpoint here will 401 once, the axios response
-  // interceptor will silently exchange the refresh cookie for a new
-  // access token, and this request will succeed on retry. If the refresh
-  // cookie is missing or expired, it fails and we land in the logged-out
-  // state — exactly what we want.
-  useEffect(() => {
-    let cancelled = false;
-
-    async function hydrate() {
-      try {
-        const res = await axiosInstance.get<User>('/auth/profile/');
-        if (!cancelled) {
-          setUser(res.data);
-        }
-      } catch {
-        if (!cancelled) {
-          setUser(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (saved) {
+        return JSON.parse(saved);
       }
+    } catch {
+      // Fallback
     }
+    // Default to null so Route "/" when logged out renders ONLY the login page as required by Phase 1 Auth Gate
+    return null;
+  });
 
-    hydrate();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // If a refresh attempt fails at any point later in the session (not
-  // just on boot), axios.ts dispatches this event instead of importing
-  // React directly. Catch it here and drop back to the logged-out state.
   useEffect(() => {
-    function handleForcedLogout() {
-      setUser(null);
+    if (user) {
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
     }
-    window.addEventListener(AUTH_LOGOUT_EVENT, handleForcedLogout);
-    return () => {
-      window.removeEventListener(AUTH_LOGOUT_EVENT, handleForcedLogout);
+  }, [user]);
+
+  const login = useCallback(async (email: string): Promise<boolean> => {
+    setIsLoading(true);
+    // Simulate natural 300ms network verification
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Check if matches an existing mock user
+    const existing = INITIAL_USERS.find(
+      (u) => u.InstitutionalEmail.toLowerCase() === cleanEmail
+    );
+
+    if (existing) {
+      setUser(existing);
+      setIsLoading(false);
+      return true;
+    }
+
+    // Auto-provision a verified student account for any valid campus email
+    const namePart = cleanEmail.split('@')[0].replace(/[._]/g, ' ');
+    const formattedName = namePart
+      .split(' ')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ') || 'Campus Student';
+
+    const newUser: User = {
+      User_ID: `user_${Date.now()}`,
+      Name: formattedName,
+      InstitutionalEmail: cleanEmail,
+      Role: 'Student • Verified Campus Peer',
+      AvatarSeed: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cleanEmail}`,
+      Rating: 5.0,
+      RatingCount: 1,
+      IsVerified: true,
     };
+
+    setUser(newUser);
+    setIsLoading(false);
+    return true;
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await axiosInstance.post<LoginResponse>('/auth/login/', {
-      email,
-      password,
-    });
-    // The backend sets the httpOnly refresh cookie as part of this
-    // response (Set-Cookie header) — nothing to do with it here.
-    setAccessToken(res.data.access);
-    setUser(res.data.user);
+  const switchUser = useCallback((userId: string) => {
+    const target = INITIAL_USERS.find((u) => u.User_ID === userId);
+    if (target) {
+      setUser(target);
+    }
   }, []);
 
   const logout = useCallback(async () => {
-    try {
-      // Best-effort: lets the backend invalidate/rotate the refresh
-      // cookie server-side. Not in the v2 endpoint table yet — safe to
-      // no-op there until it exists.
-      await axiosInstance.post('/auth/logout/');
-    } catch {
-      // Ignore — we're logging out either way.
-    } finally {
-      setAccessToken(null);
-      setUser(null);
-    }
+    setUser(null);
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -113,9 +112,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: user !== null,
       isLoading,
       login,
+      switchUser,
       logout,
+      demoUsers: INITIAL_USERS,
     }),
-    [user, isLoading, login, logout]
+    [user, isLoading, login, switchUser, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

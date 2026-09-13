@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import BrandLogo from '../components/brand/BrandLogo';
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -19,11 +19,10 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await axios.post('/api/auth/register/', { name, email, password });
-      await login(email, password);
+      await login(email);
       navigate('/');
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err?.response?.data?.detail || 'Registration failed. Please try again.');
+    } catch {
+      setError('Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -33,6 +32,7 @@ export default function RegisterPage() {
     <div className="flex min-h-[75vh] items-center justify-center px-4">
       <div className="w-full max-w-md space-y-6 rounded-2xl border border-line bg-panel/70 p-8 shadow-xl backdrop-blur-sm">
         <div className="text-center">
+            <BrandLogo size={44} className="mx-auto mb-3" />
           <h1 className="font-display text-2xl font-bold tracking-tight text-ink">Create an account</h1>
           <p className="mt-1 text-sm text-ink-muted">Join Campus-Bazaar to buy and sell on campus</p>
         </div>
@@ -54,7 +54,7 @@ export default function RegisterPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Your name"
-              className="mt-1.5 w-full rounded-xl border border-line bg-white/5 px-4 py-2.5 text-sm text-ink placeholder-white/20 outline-none transition focus:border-buy focus:ring-1 focus:ring-buy"
+              className="mt-1.5 w-full rounded-xl border border-line/15 bg-black/[0.03] dark:bg-white/5 px-4 py-2.5 text-sm text-ink placeholder-ink-muted/50 outline-none transition focus:border-buy focus:ring-1 focus:ring-buy"
             />
           </div>
 
@@ -68,7 +68,7 @@ export default function RegisterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="student@vitstudent.ac.in"
-              className="mt-1.5 w-full rounded-xl border border-line bg-white/5 px-4 py-2.5 text-sm text-ink placeholder-white/20 outline-none transition focus:border-buy focus:ring-1 focus:ring-buy"
+              className="mt-1.5 w-full rounded-xl border border-line/15 bg-black/[0.03] dark:bg-white/5 px-4 py-2.5 text-sm text-ink placeholder-ink-muted/50 outline-none transition focus:border-buy focus:ring-1 focus:ring-buy"
             />
           </div>
 
@@ -82,7 +82,7 @@ export default function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="mt-1.5 w-full rounded-xl border border-line bg-white/5 px-4 py-2.5 text-sm text-ink placeholder-white/20 outline-none transition focus:border-buy focus:ring-1 focus:ring-buy"
+              className="mt-1.5 w-full rounded-xl border border-line/15 bg-black/[0.03] dark:bg-white/5 px-4 py-2.5 text-sm text-ink placeholder-ink-muted/50 outline-none transition focus:border-buy focus:ring-1 focus:ring-buy"
             />
           </div>
 

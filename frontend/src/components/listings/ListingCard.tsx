@@ -1,27 +1,23 @@
 // src/components/listings/ListingCard.tsx
-import {
-  useRef,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-  type PointerEvent as ReactPointerEvent,
-} from 'react';
+import { type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, useMotionValue, animate } from 'framer-motion';
-import { Heart } from 'lucide-react';
-import type { Listing, ListingCondition } from '../../types/api';
+import { motion } from 'framer-motion';
+import { Heart, ShieldCheck, Tag } from 'lucide-react';
+import type { Item, ListingCondition } from '../../types/market';
+import { Apple3DCard } from '../common/Apple3DCard';
+import { useAuth } from '../../context/AuthContext';
+import { useMarket } from '../../context/MarketContext';
+import { POP_SPRING } from '../../lib/motion';
+import RatingStars from '../common/RatingStars';
 
 interface ListingCardProps {
-  listing: Listing;
-  /** Optional — wire this to your favorites mutation once its request
-   *  contract (POST/DELETE shape) is finalized. Without it, the heart
-   *  still toggles locally so the interaction reads correctly in the UI. */
-  onToggleFavorite?: (listingId: number) => void;
+  item: Item;
 }
 
 const CONDITION_STYLES: Record<ListingCondition, string> = {
-  new: 'bg-buy/15 text-buy border-buy/30',
-  good: 'bg-white/5 text-ink-muted border-white/10',
-  fair: 'bg-warn/15 text-warn border-warn/30',
+  new: 'bg-emerald-700 text-white border-emerald-800 dark:bg-emerald-500 dark:text-emerald-950 dark:border-emerald-400',
+  good: 'bg-slate-700 text-white border-slate-800 dark:bg-slate-200 dark:text-slate-900 dark:border-slate-300',
+  fair: 'bg-amber-700 text-white border-amber-800 dark:bg-amber-400 dark:text-amber-950 dark:border-amber-300',
 };
 
 const CONDITION_LABEL: Record<ListingCondition, string> = {
@@ -30,92 +26,158 @@ const CONDITION_LABEL: Record<ListingCondition, string> = {
   fair: 'Fair',
 };
 
-export default function ListingCard({ listing, onToggleFavorite }: ListingCardProps) {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const [isFavorited, setIsFavorited] = useState(listing.is_favorited);
+export default function ListingCard({ item }: ListingCardProps) {
+  const { user } = useAuth();
+  const { getUser, isWishlisted, toggleWishlist } = useMarket();
 
-  const rotateX = useMotionValue(0);
-  const rotateY = useMotionValue(0);
+  const isFavorited = isWishlisted(item.Item_ID);
+  const isOwnListing = user?.User_ID === item.Seller_ID;
+  const seller = getUser(item.Seller_ID);
 
-  function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
-    // Tilt only responds to an actual mouse — there's no cursor position
-    // to track on touch, so skip it there rather than fake a jitter.
-    if (event.pointerType !== 'mouse' || !cardRef.current) return;
-
-    const bounds = cardRef.current.getBoundingClientRect();
-    const x = (event.clientX - bounds.left) / bounds.width - 0.5;
-    const y = (event.clientY - bounds.top) / bounds.height - 0.5;
-
-    rotateY.set(x * 10);
-    rotateX.set(y * -10);
+  function handleToggleFavorite(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleWishlist(item.Item_ID);
   }
 
-  function handlePointerLeave() {
-    animate(rotateX, 0, { duration: 0.4, ease: 'easeOut' });
-    animate(rotateY, 0, { duration: 0.4, ease: 'easeOut' });
-  }
-
-  function handleToggleFavorite(event: ReactMouseEvent) {
-    event.preventDefault(); // don't follow the card's Link
-    event.stopPropagation();
-    setIsFavorited((prev) => !prev);
-    onToggleFavorite?.(listing.id);
-  }
-
-  const coverImage = [...listing.images].sort((a, b) => a.order - b.order)[0];
+  const coverImage = item.Images[0];
 
   return (
-    <Link to={`/listings/${listing.id}`} className="block [perspective:1000px]">
-      <motion.div
-        ref={cardRef}
-        onPointerMove={handlePointerMove}
-        onPointerLeave={handlePointerLeave}
-        style={{ rotateX, rotateY, transformStyle: 'preserve-3d' }}
-        className="group relative overflow-hidden rounded-2xl border border-line bg-panel/60 backdrop-blur-md transition-shadow duration-300 hover:border-buy/40 hover:shadow-[0_0_24px_-6px_rgba(124,156,255,0.35)]"
+    <motion.div
+      layout
+      layoutId={`item-card-${item.Item_ID}`}
+      initial={{ opacity: 0, y: 16, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+      transition={{
+        type: 'spring',
+        stiffness: 300,
+        damping: 20,
+      }}
+      className="h-full"
+    >
+      <Link
+        to={`/item/${item.Item_ID}`}
+        className="block h-full outline-none focus-visible:ring-2 focus-visible:ring-purple-500 rounded-3xl"
       >
-        <div className="relative aspect-[4/3] overflow-hidden bg-panel">
-          {coverImage ? (
-            <img
-              src={coverImage.url}
-              alt={listing.title}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-sm text-ink-muted">
-              No photo yet
-            </div>
-          )}
-
-          <span
-            className={`absolute left-3 top-3 rounded-full border px-2.5 py-1 text-xs font-medium ${CONDITION_STYLES[listing.condition]}`}
+        <Apple3DCard className="h-full">
+          {/* Layer 1: Background & image layer — translateZ(0) */}
+          <div
+            className="relative aspect-[4/3] overflow-hidden rounded-t-3xl bg-surface-elevated"
+            style={{ transform: 'translateZ(0px)', transformStyle: 'preserve-3d' }}
           >
-            {CONDITION_LABEL[listing.condition]}
-          </span>
+            {coverImage ? (
+              <img
+                src={coverImage}
+                alt={item.Title}
+                loading="lazy"
+                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-sm text-ink-muted">
+                No photo available
+              </div>
+            )}
 
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.85 }}
-            onClick={handleToggleFavorite}
-            aria-pressed={isFavorited}
-            aria-label={isFavorited ? 'Remove from saved items' : 'Save this listing'}
-            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-black/30 backdrop-blur-md"
-          >
-            <Heart
-              className={`h-4 w-4 transition-colors ${isFavorited ? 'fill-buy text-buy' : 'text-white'}`}
-            />
-          </motion.button>
-        </div>
+            {/* "Your listing" indicator pill */}
+            {isOwnListing && (
+              <span
+                className="absolute left-3 top-3 z-30 rounded-full border border-purple-500/30 bg-purple-900/80 px-2.5 py-1 text-[11px] font-bold text-purple-200 backdrop-blur-md shadow-md"
+                style={{ transform: 'translateZ(30px)' }}
+              >
+                Your listing
+              </span>
+            )}
 
-        <div className="space-y-1 p-4">
-          <h3 className="truncate font-medium text-ink">{listing.title}</h3>
-          <div className="flex items-baseline justify-between">
-            <span className="font-display text-lg font-semibold tabular-nums text-sell">
-              ${Number(listing.price).toFixed(0)}
-            </span>
-            <span className="text-xs text-ink-muted">{listing.category.name}</span>
+            {/* Wishlist Heart Button with Scale-Bounce micro-interaction */}
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.15 }}
+              whileTap={{ scale: 0.82 }}
+              transition={POP_SPRING}
+              onClick={handleToggleFavorite}
+              aria-pressed={isFavorited}
+              aria-label={isFavorited ? 'Remove from saved' : 'Save item'}
+              className="absolute right-3 top-3 z-30 flex h-8 w-8 items-center justify-center rounded-full border border-black/10 dark:border-white/15 bg-white/80 dark:bg-black/60 backdrop-blur-md transition-colors"
+              style={{ transform: 'translateZ(30px)' }}
+            >
+              <Heart
+                className={`h-4 w-4 transition-colors ${
+                  isFavorited
+                    ? 'fill-purple-600 text-purple-600 dark:fill-purple-400 dark:text-purple-400'
+                    : 'text-slate-700 dark:text-white'
+                }`}
+              />
+            </motion.button>
           </div>
-        </div>
-      </motion.div>
-    </Link>
+
+          {/* Layer 2: Title and metadata layer — translateZ(35px) */}
+          <div
+            className="space-y-2.5 p-4"
+            style={{ transform: 'translateZ(35px)', transformStyle: 'preserve-3d' }}
+          >
+            <h3
+              className="truncate font-semibold text-ink group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors"
+              style={{ transform: 'translateZ(35px)' }}
+            >
+              {item.Title}
+            </h3>
+
+            {/* Seller info row with rating */}
+            <div
+              className="flex items-center justify-between text-xs text-ink-muted"
+              style={{ transformStyle: 'preserve-3d' }}
+            >
+              <div className="flex items-center gap-1.5 overflow-hidden">
+                <img
+                  src={seller?.AvatarSeed || ''}
+                  alt={seller?.Name}
+                  className="h-4 w-4 rounded-full object-cover flex-shrink-0"
+                />
+                <span className="truncate">{seller?.Name || 'Campus Peer'}</span>
+                {seller?.IsVerified && (
+                  <ShieldCheck className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
+                )}
+              </div>
+              {seller && (
+                <div className="flex-shrink-0">
+                  <RatingStars value={seller.Rating} size={11} showScore />
+                </div>
+              )}
+            </div>
+
+            {/* Bottom metadata row */}
+            <div
+              className="flex items-center justify-between gap-2 pt-1 border-t border-black/5 dark:border-white/5"
+              style={{ transformStyle: 'preserve-3d' }}
+            >
+              {/* Layer 3: Price tag — translateZ(55px) (floating highest) */}
+              <span
+                className="font-display text-xl font-bold tabular-nums text-sell"
+                style={{ transform: 'translateZ(55px)' }}
+              >
+                ${item.Price}
+              </span>
+
+              {/* Category label and condition badge flush directly adjacent to each other */}
+              <div
+                className="flex items-center gap-1.5"
+                style={{ transform: 'translateZ(35px)' }}
+              >
+                <span className="text-xs font-medium text-ink-muted flex items-center gap-1">
+                  <Tag className="h-3 w-3 opacity-60" />
+                  {item.Category}
+                </span>
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border shadow-sm ${CONDITION_STYLES[item.Condition]}`}
+                >
+                  {CONDITION_LABEL[item.Condition]}
+                </span>
+              </div>
+            </div>
+          </div>
+        </Apple3DCard>
+      </Link>
+    </motion.div>
   );
 }

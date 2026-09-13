@@ -1,17 +1,323 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap');
+@config "../tailwind.config.js";
 
 @theme {
-  --font-display: 'Space Grotesk', sans-serif;
-  --font-body: 'Manrope', sans-serif;
+  --color-surface: rgb(var(--surface));
+  --color-surface-base: rgb(var(--surface-base));
+  --color-surface-panel: rgb(var(--surface-panel));
+  --color-surface-elevated: rgb(var(--surface-elevated));
+  --color-panel: rgb(var(--panel));
 
-  --color-surface: #0E1116;
-  --color-panel: #171B23;
-  --color-line: #2B3140;
-  --color-ink: #F1F3F7;
-  --color-ink-muted: #8D95A6;
-  --color-sell: #FF8A4C;
-  --color-sell-ink: #1A0F06;
-  --color-buy: #7C9CFF;
-  --color-warn: #FFB020;
+  --color-ink: rgb(var(--ink));
+  --color-ink-primary: rgb(var(--ink-primary));
+  --color-ink-secondary: rgb(var(--ink-secondary));
+  --color-ink-muted: rgb(var(--ink-muted));
+  --color-ink-tertiary: rgb(var(--ink-tertiary));
+
+  --color-line: rgb(var(--line));
+  --color-borderline: rgb(var(--borderline));
+
+  --color-brand: rgb(var(--brand));
+  --color-brand-soft: rgb(var(--brand-soft));
+  --color-brand-deep: rgb(var(--brand-deep));
+  --color-brand-tint: rgb(var(--brand-tint));
+
+  --color-accent: rgb(var(--accent));
+  --color-accent-soft: rgb(var(--accent-soft));
+
+  --color-buy: rgb(var(--buy));
+  --color-sell: rgb(var(--sell));
+  --color-sell-ink: rgb(var(--sell-ink));
+  --color-warn: rgb(var(--warn));
+
+  --shadow-3d-sm: var(--shadow-3d-sm);
+  --shadow-3d-md: var(--shadow-3d-md);
+  --shadow-3d-lg: var(--shadow-3d-lg);
+  --shadow-specular: var(--shadow-specular);
+  --shadow-specular-lg: var(--shadow-specular-lg);
+
+  --font-display: "SF Pro Display", Inter, system-ui, sans-serif;
+  --font-text: "SF Pro Text", Inter, system-ui, sans-serif;
+  --font-body: "SF Pro Text", Inter, system-ui, sans-serif;
+
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring-snap: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ============================================================
+   Campus Bazaar — Dual Color Architecture
+   Light: "Ceramic & Royal Purple"
+   Dark:  "Deep Obsidian & Neon Purple"
+
+   Every color below is exposed as an `R G B` triplet so Tailwind
+   classes can apply their own alpha (`bg-panel/70`, `border-line/10`,
+   etc). Both the newer surface/ink/brand/accent tokens AND the
+   existing panel/line/buy/sell/warn tokens are defined here, since
+   both are referenced across the app.
+   ============================================================ */
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces — crisp ceramic white (#ffffff) */
+  --surface: 255 255 255;           /* #ffffff */
+  --surface-base: 255 255 255;
+  --panel: 255 255 255;
+  --surface-panel: 255 255 255;
+  --surface-elevated: 255 255 255;
+
+  /* Hairline borders — dark ink at low alpha, applied via /5, /10 etc. */
+  --line: 0 0 0;
+  --borderline: 0 0 0;
+
+  /* Ink — pitch-black/slate text (#020617 / #0f172a) */
+  --ink: 2 6 23;                    /* #020617 */
+  --ink-primary: 2 6 23;            /* #020617 */
+  --ink-secondary: 15 23 42;        /* #0f172a */
+  --ink-muted: 100 116 139;         /* #64748b slate-500 */
+  --ink-tertiary: 148 163 184;      /* #94a3b8 */
+
+  /* Brand — vivid royal purple accents (#7c3aed, #9333ea) */
+  --brand: 124 58 237;              /* #7c3aed violet-600, primary CTA */
+  --brand-soft: 147 51 234;         /* #9333ea violet-600 */
+  --brand-deep: 91 33 182;          /* #5b21b6 violet-800, pressed states */
+  --brand-tint: 243 232 255;        /* #f3e8ff ambient wash */
+
+  /* Accent — specular pink/fuchsia */
+  --accent: 236 72 153;             /* #ec4899 */
+  --accent-soft: 244 133 186;
+
+  /* Buy / Sell / Warn */
+  --buy: 124 58 237;                /* #7c3aed */
+  --sell: 147 51 234;               /* #9333ea */
+  --sell-ink: 255 255 255;
+  --warn: 180 83 9;                 /* #b45309 amber-700 */
+
+  /* Frosted glass — translucent with crisp borders (rgba(0,0,0,0.08)) */
+  --glass-fill: 255 255 255;
+  --glass-fill-alpha: 0.75;
+  --glass-border-alpha: 0.08;
+
+  /* Specular top-edge highlight */
+  --specular-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+
+  /* 3D elevation stack */
+  --shadow-3d-sm:
+    0 1px 2px rgba(2, 6, 23, 0.05),
+    0 2px 6px rgba(2, 6, 23, 0.06),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+  --shadow-3d-md:
+    0 4px 10px rgba(2, 6, 23, 0.07),
+    0 12px 24px rgba(2, 6, 23, 0.09),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+  --shadow-3d-lg:
+    0 10px 24px rgba(2, 6, 23, 0.09),
+    0 24px 48px rgba(2, 6, 23, 0.12),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+  --shadow-specular:
+    0 8px 30px rgba(124, 58, 237, 0.2),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+  --shadow-specular-lg:
+    0 16px 48px rgba(124, 58, 237, 0.24),
+    0 4px 16px rgba(236, 72, 153, 0.14),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+
+  /* Ambient background glow — subtle, radiant purple accents */
+  --ambient-bg:
+    radial-gradient(circle at 12% -8%, rgba(124, 58, 237, 0.10), transparent 42%),
+    radial-gradient(circle at 88% 18%, rgba(147, 51, 234, 0.08), transparent 40%),
+    radial-gradient(circle at 50% 100%, rgba(243, 232, 255, 0.65), transparent 55%);
+}
+
+.dark {
+  color-scheme: dark;
+
+  /* Surfaces — pure deep obsidian black (#030712 / #09090b) */
+  --surface: 3 7 18;                /* #030712 */
+  --surface-base: 3 7 18;
+  --panel: 9 9 11;                  /* #09090b */
+  --surface-panel: 9 9 11;
+  --surface-elevated: 17 17 23;     /* #111117 */
+
+  --line: 255 255 255;
+  --borderline: 255 255 255;
+
+  /* Ink — bright crisp white text (#f8fafc) */
+  --ink: 248 250 252;               /* #f8fafc */
+  --ink-primary: 248 250 252;       /* #f8fafc */
+  --ink-secondary: 226 232 240;     /* #e2e8f0 */
+  --ink-muted: 148 163 184;         /* #94a3b8 */
+  --ink-tertiary: 100 116 139;
+
+  /* Brand — luminous neon-purple/violet glow accents (#a855f7, #c084fc) */
+  --brand: 168 85 247;              /* #a855f7 neon purple */
+  --brand-soft: 192 132 252;        /* #c084fc violet glow */
+  --brand-deep: 147 51 234;         /* #9333ea */
+  --brand-tint: 59 7 100;           /* #3b0764 deep violet wash */
+
+  --accent: 232 121 249;            /* #e879f9 fuchsia neon */
+  --accent-soft: 240 171 252;
+
+  --buy: 168 85 247;                /* #a855f7 */
+  --sell: 192 132 252;               /* #c084fc */
+  --sell-ink: 3 7 18;
+  --warn: 251 191 36;               /* amber-400 */
+
+  /* Frosted glass — dark translucent with specular neon borders (rgba(255,255,255,0.1)) */
+  --glass-fill: 17 17 23;
+  --glass-fill-alpha: 0.6;
+  --glass-border-alpha: 0.1;
+
+  --specular-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+
+  --shadow-3d-sm:
+    0 1px 2px rgba(0, 0, 0, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+  --shadow-3d-md:
+    0 6px 16px rgba(0, 0, 0, 0.65),
+    0 16px 32px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+  --shadow-3d-lg:
+    0 14px 32px rgba(0, 0, 0, 0.75),
+    0 32px 64px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+  --shadow-specular:
+    0 8px 30px rgba(168, 85, 247, 0.35),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+  --shadow-specular-lg:
+    0 20px 60px rgba(168, 85, 247, 0.45),
+    0 6px 20px rgba(232, 121, 249, 0.35),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+
+  /* Ambient background glow — glowing violet/grape radial textures */
+  --ambient-bg:
+    radial-gradient(circle at 15% -10%, rgba(168, 85, 247, 0.25), transparent 45%),
+    radial-gradient(circle at 85% 15%, rgba(232, 121, 249, 0.16), transparent 42%),
+    radial-gradient(circle at 50% 100%, rgba(76, 29, 149, 0.32), transparent 55%);
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-surface text-ink antialiased;
+  background-image: var(--ambient-bg);
+  background-attachment: fixed;
+  transition:
+    background-color 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ============================================================
+   Apple-style frosted glass
+   ============================================================ */
+
+.apple-glass {
+  background-color: rgba(var(--glass-fill), var(--glass-fill-alpha));
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(var(--borderline), var(--glass-border-alpha));
+}
+
+.apple-glass-thin {
+  background-color: rgba(
+    var(--glass-fill),
+    calc(var(--glass-fill-alpha) - 0.2)
+  );
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(var(--borderline), var(--glass-border-alpha));
+}
+
+/* ============================================================
+   Hardware-like inset beveled border (laser-cut sub-pixel edge)
+   ============================================================ */
+
+.specular-border {
+  position: relative;
+  border: 1px solid rgba(var(--borderline), var(--glass-border-alpha));
+  box-shadow: var(--specular-highlight);
+}
+
+.specular-border::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.35),
+    rgba(255, 255, 255, 0) 40%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.5;
+}
+
+/* ============================================================
+   Micro-interactions
+   ============================================================ */
+
+.tap-target {
+  touch-action: manipulation;
+}
+
+.focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  box-shadow: 0 0 0 3px rgba(var(--brand), 0.45);
+}
+
+.press-feedback {
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.press-feedback:active {
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================
+   Scrollbars
+   ============================================================ */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--ink-muted), 0.35);
+  border-radius: 999px;
+  border: 2px solid rgb(var(--surface));
 }

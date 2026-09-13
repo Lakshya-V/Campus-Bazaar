@@ -1,120 +1,94 @@
 // src/components/layout/Navbar.tsx
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Plus, LogOut, User as UserIcon } from 'lucide-react';
+import { Plus, MoreVertical } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import Logo from '../Logo';
+import SearchAutocomplete from '../listings/SearchAutocomplete';
+import NotificationsDropdown from './NotificationsDropdown';
+import AccountMenu from './AccountMenu';
 
 export default function Navbar() {
-  const { user, isAuthenticated, logout } = useAuth();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const { user, isAuthenticated } = useAuth();
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  async function handleLogout() {
-    setMenuOpen(false);
-    await logout();
-    navigate('/');
+  if (!isAuthenticated) {
+    return null; // When logged out, Phase 1 Auth Gate rules state: "Route '/' when logged out renders ONLY the login page — no navbar/app chrome."
   }
 
-  const initials = (user?.username ?? '??').slice(0, 2).toUpperCase();
+  function handleSelectCategory(catName: string) {
+    navigate(`/?category=${encodeURIComponent(catName)}`);
+  }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-panel/70 backdrop-blur-md">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        <Link to="/" className="font-display text-lg font-semibold tracking-tight text-ink">
-          Campus Bazaar
-        </Link>
+    <>
+      <header className="sticky top-0 z-40 border-b border-black/8 bg-white/80 backdrop-blur-xl transition-colors duration-300 dark:border-white/10 dark:bg-[#030712]/80">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          {/* Logo with Cart + CB lettering */}
+          <Link
+            to="/"
+            className="group flex items-center gap-3 transition-transform active:scale-95 flex-shrink-0"
+          >
+            <Logo size={40} className="transition-transform group-hover:scale-105" />
+            <span className="hidden sm:inline font-display text-lg font-bold tracking-tight">
+              <span className="text-slate-900 transition-colors duration-300 dark:text-white">
+                Campus
+              </span>{' '}
+              <span className="bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent dark:from-purple-400 dark:to-fuchsia-400">
+                Bazaar
+              </span>
+            </span>
+          </Link>
 
-        {isAuthenticated ? (
-          <div className="flex items-center gap-3">
+          {/* Autocomplete Search Bar */}
+          <div className="flex-1 max-w-lg mx-2">
+            <SearchAutocomplete
+              query={searchQuery}
+              onQueryChange={setSearchQuery}
+              onSelectCategory={handleSelectCategory}
+            />
+          </div>
+
+          {/* Right Action Chrome */}
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-shrink-0">
+            {/* Post an Item CTA */}
             <Link
-              to="/listings/new"
-              className="flex items-center gap-1.5 rounded-lg bg-sell px-3.5 py-2 text-sm font-medium text-sell-ink transition-transform active:scale-95"
+              to="/sell/new"
+              className="flex items-center gap-1.5 rounded-xl bg-purple-600 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-sm transition-all hover:bg-purple-700 active:scale-95 dark:bg-purple-600 dark:hover:bg-purple-500"
             >
               <Plus className="h-4 w-4" strokeWidth={2.5} />
-              Post a listing
+              <span className="hidden sm:inline">Post an Item</span>
+              <span className="sm:hidden">Sell</span>
             </Link>
 
-            <div className="relative" ref={menuRef}>
-              <button
-                type="button"
-                onClick={() => setMenuOpen((open) => !open)}
-                aria-expanded={menuOpen}
-                aria-haspopup="menu"
-                className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-line bg-panel text-sm font-medium text-ink"
-              >
-                {user?.avatar_url ? (
-                  <img
-                    src={user.avatar_url}
-                    alt={user.username}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  initials
-                )}
-              </button>
+            {/* Notification Bell with Badge */}
+            <NotificationsDropdown />
 
-              {menuOpen && (
-                <div
-                  role="menu"
-                  className="absolute right-0 mt-2 w-48 overflow-hidden rounded-lg border border-line bg-panel shadow-xl"
-                >
-                  <div className="border-b border-line px-3.5 py-2.5">
-                    <p className="truncate text-sm font-medium text-ink">{user?.username}</p>
-                    <p className="truncate text-xs text-ink-muted">{user?.email}</p>
-                  </div>
-                  <Link
-                    to="/profile"
-                    role="menuitem"
-                    onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-2 px-3.5 py-2.5 text-sm text-ink hover:bg-white/5"
-                  >
-                    <UserIcon className="h-4 w-4" />
-                    My listings
-                  </Link>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={handleLogout}
-                    className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm text-ink hover:bg-white/5"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Log out
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Link
-              to="/login"
-              className="rounded-lg px-3.5 py-2 text-sm font-medium text-ink-muted hover:text-ink"
+            {/* Amazon-style Account 3-Dot / Profile Avatar Trigger */}
+            <button
+              type="button"
+              onClick={() => setAccountMenuOpen(true)}
+              aria-label="Account & Settings menu"
+              className="flex items-center gap-1.5 rounded-xl border border-black/10 bg-white/60 p-1 pr-1.5 text-ink transition-all hover:border-purple-500/40 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:hover:border-purple-400/40"
             >
-              Log in
-            </Link>
-            <motion.div whileTap={{ scale: 0.96 }}>
-              <Link
-                to="/register"
-                className="block rounded-lg bg-buy px-3.5 py-2 text-sm font-medium text-surface"
-              >
-                Sign up
-              </Link>
-            </motion.div>
+              <img
+                src={user?.AvatarSeed}
+                alt={user?.Name || 'User'}
+                className="h-7 w-7 rounded-lg object-cover ring-1 ring-purple-500/30"
+              />
+              <MoreVertical className="h-3.5 w-3.5 text-ink-muted" />
+            </button>
           </div>
-        )}
-      </div>
-    </header>
+        </div>
+      </header>
+
+      {/* Slide-over Profile / Account Drawer */}
+      <AccountMenu
+        isOpen={accountMenuOpen}
+        onClose={() => setAccountMenuOpen(false)}
+      />
+    </>
   );
 }
