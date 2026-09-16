@@ -63,12 +63,13 @@ export function Apple3DCard({
   const glareOpacity = useTransform(hoverSpring, [0, 1], [0, 1]);
 
   // Ambient box-shadow / glow bloom on hover pulling from theme's brand/accent token
+  // Light: #2F6FED @ 18%, Dark: #4F8CFF @ 35%
   const elevationShadow = useTransform(
     hoverSpring,
     [0, 1],
     [
-      '0 4px 10px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04)',
-      '0 25px 50px -12px rgba(var(--brand), 0.18), 0 0 45px -8px rgba(var(--accent), 0.12)'
+      '0 4px 10px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03)',
+      '0 25px 50px -12px rgba(var(--brand), 0.18), 0 0 45px -8px rgba(var(--brand-soft), 0.35)'
     ]
   );
 

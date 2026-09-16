@@ -14,6 +14,68 @@ export const INITIAL_CATEGORIES: Category[] = [
   { Category_ID: 'cat_transport', Name: 'Transport & Sports' },
 ];
 
+export interface CategoryMeta {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+}
+
+export const CATEGORY_METAS: CategoryMeta[] = [
+  {
+    id: 'cat_tech',
+    slug: 'electronics-tech',
+    name: 'Electronics & Tech',
+    description: 'Calculators, laptops, headphones, monitors, and digital study tools.',
+  },
+  {
+    id: 'cat_books',
+    slug: 'textbooks',
+    name: 'Textbooks',
+    description: 'Course textbooks, solutions manuals, study guides, and lab notebooks.',
+  },
+  {
+    id: 'cat_dorm',
+    slug: 'dorm-furniture',
+    name: 'Dorm & Furniture',
+    description: 'Desks, ergonomic chairs, lamps, storage carts, and room essentials.',
+  },
+  {
+    id: 'cat_appliances',
+    slug: 'appliances',
+    name: 'Appliances',
+    description: 'Mini fridges, coffee makers, microwaves, electric kettles, and blenders.',
+  },
+  {
+    id: 'cat_transport',
+    slug: 'transport-sports',
+    name: 'Transport & Sports',
+    description: 'Commuter bikes, skateboards, gym gear, locks, and campus transit essentials.',
+  },
+];
+
+export function getCategorySlug(categoryNameOrId: string): string {
+  const norm = categoryNameOrId.trim().toLowerCase();
+  const found = CATEGORY_METAS.find(
+    (c) =>
+      c.id.toLowerCase() === norm ||
+      c.name.toLowerCase() === norm ||
+      c.slug.toLowerCase() === norm
+  );
+  if (found) return found.slug;
+  return norm.replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+export function findCategoryMeta(slugOrIdOrName: string): CategoryMeta | undefined {
+  const norm = slugOrIdOrName.trim().toLowerCase();
+  return CATEGORY_METAS.find(
+    (c) =>
+      c.slug.toLowerCase() === norm ||
+      c.id.toLowerCase() === norm ||
+      c.name.toLowerCase() === norm
+  );
+}
+
 export const INITIAL_USERS: User[] = [
   {
     User_ID: 'user_alex',
@@ -96,7 +158,10 @@ export const INITIAL_ITEMS: Item[] = [
     Price: 65,
     Condition: 'good',
     Status: 'AVAILABLE',
-    Images: ['https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=800&q=80'],
+    Images: [
+      'https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=800&q=80',
+      'https://images.unsplash.com/photo-1611117775350-ac3950990985?w=800&q=80',
+    ],
     Description:
       'Mint condition color screen calculator, required for calculus and linear algebra. Includes USB charging cable and protective slide cover. Battery holds full charge for weeks.',
     PostedAt: '2026-09-10T10:00:00Z',
@@ -110,7 +175,11 @@ export const INITIAL_ITEMS: Item[] = [
     Price: 240,
     Condition: 'new',
     Status: 'AVAILABLE',
-    Images: ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80'],
+    Images: [
+      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80',
+      'https://images.unsplash.com/photo-1484704849700-f032a568e944?w=800&q=80',
+      'https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=800&q=80',
+    ],
     Description:
       'Black finish, purchased 4 months ago for library focus. Industry-leading active noise canceling, pristine high-resolution sound, includes original magnetic carry case and 3.5mm aux audio cord.',
     PostedAt: '2026-09-11T12:30:00Z',
@@ -214,6 +283,174 @@ export const INITIAL_ITEMS: Item[] = [
     PostedAt: '2026-09-05T13:05:00Z',
     ViewCount: 29,
   },
+  {
+    Item_ID: 'item_110',
+    Seller_ID: 'user_alex',
+    Title: 'Stewart Calculus: Early Transcendentals (9th Edition)',
+    Category: 'Textbooks',
+    Price: 55,
+    Condition: 'good',
+    Status: 'AVAILABLE',
+    Images: ['https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&q=80'],
+    Description:
+      'Standard calculus textbook for MATH 151/152. Crisp pages, no dog-ears, hardcover spine in great structural shape.',
+    PostedAt: '2026-09-12T11:20:00Z',
+    ViewCount: 47,
+  },
+  {
+    Item_ID: 'item_111',
+    Seller_ID: 'user_sarah',
+    Title: 'Introduction to Algorithms (CLRS 4th Edition)',
+    Category: 'Textbooks',
+    Price: 65,
+    Condition: 'new',
+    Status: 'AVAILABLE',
+    Images: ['https://images.unsplash.com/photo-1516979187457-637abb4f9353?w=800&q=80'],
+    Description:
+      'The MIT Press canonical algorithms textbook. Brand new condition with intact companion download key.',
+    PostedAt: '2026-09-13T09:10:00Z',
+    ViewCount: 84,
+  },
+  {
+    Item_ID: 'item_112',
+    Seller_ID: 'user_chloe',
+    Title: 'Principles of Microeconomics (Mankiw 9th Edition)',
+    Category: 'Textbooks',
+    Price: 35,
+    Condition: 'good',
+    Status: 'AVAILABLE',
+    Images: ['https://images.unsplash.com/photo-1512820790803-83ca734da794?w=800&q=80'],
+    Description:
+      'Core textbook for ECON 101. Clean interior with neatly underlined summaries at end of chapters.',
+    PostedAt: '2026-09-11T16:00:00Z',
+    ViewCount: 38,
+  },
+  {
+    Item_ID: 'item_113',
+    Seller_ID: 'user_marcus',
+    Title: 'Ergonomic Breathable Mesh Swivel Task Chair',
+    Category: 'Dorm & Furniture',
+    Price: 60,
+    Condition: 'good',
+    Status: 'AVAILABLE',
+    Images: ['https://images.unsplash.com/photo-1580481077195-c3a8a30f7724?w=800&q=80'],
+    Description:
+      'Pneumatic height adjustment, lumbar support pillow, and smooth rollerblade wheels that will not scratch dorm vinyl flooring.',
+    PostedAt: '2026-09-10T14:30:00Z',
+    ViewCount: 52,
+  },
+  {
+    Item_ID: 'item_114',
+    Seller_ID: 'user_sarah',
+    Title: 'Full-Length Dorm Standing Mirror (Matte Black)',
+    Category: 'Dorm & Furniture',
+    Price: 25,
+    Condition: 'good',
+    Status: 'AVAILABLE',
+    Images: ['https://images.unsplash.com/photo-1618220179428-22790b461013?w=800&q=80'],
+    Description:
+      '65" x 22" aluminum alloy frame. Can lean against dorm wall or stand on its sturdy rear fold-out kickstand.',
+    PostedAt: '2026-09-09T18:15:00Z',
+    ViewCount: 41,
+  },
+  {
+    Item_ID: 'item_115',
+    Seller_ID: 'user_chloe',
+    Title: '3-Tier Heavy Duty Metal Rolling Utility Cart',
+    Category: 'Dorm & Furniture',
+    Price: 22,
+    Condition: 'new',
+    Status: 'AVAILABLE',
+    Images: ['https://images.unsplash.com/photo-1595428774223-ef52624120d2?w=800&q=80'],
+    Description:
+      'White powder-coated steel cart with lockable caster wheels. Ideal for study snacks, toiletries, or desk supplies.',
+    PostedAt: '2026-09-12T13:40:00Z',
+    ViewCount: 33,
+  },
+  {
+    Item_ID: 'item_116',
+    Seller_ID: 'user_dave',
+    Title: 'Keurig K-Mini Single Serve Coffee Maker',
+    Category: 'Appliances',
+    Price: 35,
+    Condition: 'good',
+    Status: 'AVAILABLE',
+    Images: ['https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?w=800&q=80'],
+    Description:
+      'Matte black finish, under 5 inches wide so it fits in any tight dorm corner. Brews 6-12 oz cups in under 2 minutes.',
+    PostedAt: '2026-09-11T08:50:00Z',
+    ViewCount: 61,
+  },
+  {
+    Item_ID: 'item_117',
+    Seller_ID: 'user_alex',
+    Title: 'Hamilton Beach 0.9 Cu. Ft. Countertop Microwave',
+    Category: 'Appliances',
+    Price: 45,
+    Condition: 'good',
+    Status: 'AVAILABLE',
+    Images: ['https://images.unsplash.com/photo-1574269909862-7e1d70bb8078?w=800&q=80'],
+    Description:
+      '900 watts with 10 power levels, express cook buttons, and child safety lock. Spotless glass turntable included.',
+    PostedAt: '2026-09-10T12:00:00Z',
+    ViewCount: 73,
+  },
+  {
+    Item_ID: 'item_118',
+    Seller_ID: 'user_kevin',
+    Title: 'Instant Pot Duo 7-in-1 Mini 3-Quart Electric Cooker',
+    Category: 'Appliances',
+    Price: 40,
+    Condition: 'good',
+    Status: 'AVAILABLE',
+    Images: ['https://images.unsplash.com/photo-1544233726-9f1d2b27be8b?w=800&q=80'],
+    Description:
+      'Compact size engineered for dorm kitchens and studio apartments. Rice cooker, steamer, slow cooker, and sauté pot in one.',
+    PostedAt: '2026-09-08T19:25:00Z',
+    ViewCount: 58,
+  },
+  {
+    Item_ID: 'item_119',
+    Seller_ID: 'user_chloe',
+    Title: 'Retrospec Classic Bamboo Pintail Longboard (41")',
+    Category: 'Transport & Sports',
+    Price: 55,
+    Condition: 'good',
+    Status: 'AVAILABLE',
+    Images: ['https://images.unsplash.com/photo-1520045892732-304bc3ac5d8e?w=800&q=80'],
+    Description:
+      'Smooth cruising longboard with 70mm 85A PU wheels and ABEC-7 precision bearings. Perfect for carving between lecture halls.',
+    PostedAt: '2026-09-12T15:10:00Z',
+    ViewCount: 94,
+  },
+  {
+    Item_ID: 'item_120',
+    Seller_ID: 'user_marcus',
+    Title: 'Wilson Evolution Indoor Official Basketball (Size 7)',
+    Category: 'Transport & Sports',
+    Price: 30,
+    Condition: 'new',
+    Status: 'AVAILABLE',
+    Images: ['https://images.unsplash.com/photo-1519766304817-4f37bda74a29?w=800&q=80'],
+    Description:
+      'NCAA preferred indoor game ball with signature microfiber composite cover. Used only twice at the campus rec center.',
+    PostedAt: '2026-09-11T17:45:00Z',
+    ViewCount: 46,
+  },
+  {
+    Item_ID: 'item_121',
+    Seller_ID: 'user_dave',
+    Title: 'Kryptonite Kryptolok U-Lock with 4-Foot Cable',
+    Category: 'Transport & Sports',
+    Price: 28,
+    Condition: 'good',
+    Status: 'AVAILABLE',
+    Images: ['https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=800&q=80'],
+    Description:
+      '12.7mm hardened performance steel shackle with anti-rotation deadbolt and double-loop cable for locking both wheels.',
+    PostedAt: '2026-09-09T10:30:00Z',
+    ViewCount: 67,
+  },
 ];
 
 export const INITIAL_CHAT_SESSIONS: ChatSession[] = [
@@ -278,6 +515,15 @@ export const INITIAL_MESSAGES: Message[] = [
     Sender_ID: 'user_sarah',
     Text: 'Hi Alex! Yes, I have the digital Best Buy receipt and can forward the PDF copy upon pickup.',
     Timestamp: '2026-09-12T14:40:00Z',
+  },
+  {
+    Message_ID: 'msg_2003',
+    Session_ID: 'session_002',
+    Sender_ID: 'user_sarah',
+    Text: 'Here is a quick snapshot of the original packaging and accessories:',
+    MediaType: 'image',
+    MediaUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80',
+    Timestamp: '2026-09-12T14:42:00Z',
   },
 
   // Session 003: Marcus asking Jordan about Chem book

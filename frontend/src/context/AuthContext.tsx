@@ -21,6 +21,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string) => Promise<boolean>;
+  signup: (name: string, email: string) => Promise<boolean>;
   switchUser: (userId: string) => void;
   logout: () => Promise<void>;
   demoUsers: User[];
@@ -95,6 +96,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true;
   }, []);
 
+  const signup = useCallback(async (name: string, email: string): Promise<boolean> => {
+    setIsLoading(true);
+    // Simulate natural 300ms network verification
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim() || 'Campus Student';
+
+    const newUser: User = {
+      User_ID: `user_${Date.now()}`,
+      Name: cleanName,
+      InstitutionalEmail: cleanEmail,
+      Role: 'Student • Verified Campus Peer',
+      AvatarSeed: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cleanEmail}`,
+      Rating: 5.0,
+      RatingCount: 0,
+      IsVerified: true,
+    };
+
+    setUser(newUser);
+    setIsLoading(false);
+    return true;
+  }, []);
+
   const switchUser = useCallback((userId: string) => {
     const target = INITIAL_USERS.find((u) => u.User_ID === userId);
     if (target) {
@@ -112,11 +137,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: user !== null,
       isLoading,
       login,
+      signup,
       switchUser,
       logout,
       demoUsers: INITIAL_USERS,
     }),
-    [user, isLoading, login, switchUser, logout]
+    [user, isLoading, login, signup, switchUser, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -30,15 +30,27 @@
   --color-sell-ink: rgb(var(--sell-ink));
   --color-warn: rgb(var(--warn));
 
+  --color-success: #1AA260;
+  --color-danger: #E24C4B;
+  --color-star: #F2A93B;
+
+  --color-ink-navy: #10131A;
+  --color-amber: #F2994A;
+  --color-amber-deep: #D97B2B;
+  --color-blue: #2F6FED;
+  --color-success-green: #1AA260;
+  --color-alert-red: #E24C4B;
+  --color-rating-gold: #F2A93B;
+
   --shadow-3d-sm: var(--shadow-3d-sm);
   --shadow-3d-md: var(--shadow-3d-md);
   --shadow-3d-lg: var(--shadow-3d-lg);
   --shadow-specular: var(--shadow-specular);
   --shadow-specular-lg: var(--shadow-specular-lg);
 
-  --font-display: "SF Pro Display", Inter, system-ui, sans-serif;
-  --font-text: "SF Pro Text", Inter, system-ui, sans-serif;
-  --font-body: "SF Pro Text", Inter, system-ui, sans-serif;
+  --font-display: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-text: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-spring-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -46,156 +58,188 @@
 }
 
 /* ============================================================
-   Campus Bazaar — Dual Color Architecture
-   Light: "Ceramic & Royal Purple"
-   Dark:  "Deep Obsidian & Neon Purple"
+   Campus Bazaar — Color System
+   Brand Accent:
+     Bazaar Blue (primary): #2F6FED
+     Blue Tint (light bg):  #EAF1FF
+     Blue Deep (hover):     #1B4FC4
+     Dark Glow:             #4F8CFF
 
-   Every color below is exposed as an `R G B` triplet so Tailwind
-   classes can apply their own alpha (`bg-panel/70`, `border-line/10`,
-   etc). Both the newer surface/ink/brand/accent tokens AND the
-   existing panel/line/buy/sell/warn tokens are defined here, since
-   both are referenced across the app.
+   Light Mode:
+     Surface:        #FFFFFF
+     Background:     #F5F6F8
+     Border:         #E7E9EC
+     Text Secondary: #6B7280
+     Text Primary:   #111318
+
+   Dark Mode:
+     Surface:        #16181C
+     Background:     #0D0F12
+     Border:         #2A2D33
+     Text Secondary: #9AA1AC
+     Text Primary:   #F2F3F5
+
+   Semantic Condition:
+     New:  #12A150
+     Good: #2F6FED
+     Fair: #E0912B
+
+   Semantic Status:
+     Success: #12A150
+     Sold:    #D64545
+     Star:    #FFC542
+     Muted:   #6B7280
    ============================================================ */
 
 :root {
   color-scheme: light;
 
-  /* Surfaces — crisp ceramic white (#ffffff) */
-  --surface: 255 255 255;           /* #ffffff */
-  --surface-base: 255 255 255;
-  --panel: 255 255 255;
+  /* Surfaces */
+  --surface: 255 255 255;           /* #FFFFFF */
+  --surface-base: 245 246 248;      /* #F5F6F8 */
+  --panel: 255 255 255;             /* #FFFFFF */
   --surface-panel: 255 255 255;
   --surface-elevated: 255 255 255;
 
-  /* Hairline borders — dark ink at low alpha, applied via /5, /10 etc. */
-  --line: 0 0 0;
-  --borderline: 0 0 0;
+  /* Border */
+  --line: 231 233 236;              /* #E7E9EC */
+  --borderline: 231 233 236;
 
-  /* Ink — pitch-black/slate text (#020617 / #0f172a) */
-  --ink: 2 6 23;                    /* #020617 */
-  --ink-primary: 2 6 23;            /* #020617 */
-  --ink-secondary: 15 23 42;        /* #0f172a */
-  --ink-muted: 100 116 139;         /* #64748b slate-500 */
-  --ink-tertiary: 148 163 184;      /* #94a3b8 */
+  /* Text / Ink */
+  --ink: 17 19 24;                  /* #111318 Text Primary */
+  --ink-primary: 17 19 24;          /* #111318 */
+  --ink-secondary: 107 114 128;     /* #6B7280 Text Secondary */
+  --ink-muted: 107 114 128;         /* #6B7280 */
+  --ink-tertiary: 156 163 175;
 
-  /* Brand — vivid royal purple accents (#7c3aed, #9333ea) */
-  --brand: 124 58 237;              /* #7c3aed violet-600, primary CTA */
-  --brand-soft: 147 51 234;         /* #9333ea violet-600 */
-  --brand-deep: 91 33 182;          /* #5b21b6 violet-800, pressed states */
-  --brand-tint: 243 232 255;        /* #f3e8ff ambient wash */
+  /* Brand — Bazaar Blue */
+  --brand: 47 111 237;              /* #2F6FED Bazaar Blue primary */
+  --brand-soft: 79 140 255;         /* #4F8CFF */
+  --brand-deep: 27 79 196;          /* #1B4FC4 Blue Deep hover/active */
+  --brand-tint: 234 241 255;        /* #EAF1FF Blue Tint light bg */
 
-  /* Accent — specular pink/fuchsia */
-  --accent: 236 72 153;             /* #ec4899 */
-  --accent-soft: 244 133 186;
+  --accent: 47 111 237;             /* #2F6FED */
+  --accent-soft: 79 140 255;
 
   /* Buy / Sell / Warn */
-  --buy: 124 58 237;                /* #7c3aed */
-  --sell: 147 51 234;               /* #9333ea */
+  --buy: 47 111 237;                /* #2F6FED */
+  --sell: 47 111 237;               /* #2F6FED */
   --sell-ink: 255 255 255;
-  --warn: 180 83 9;                 /* #b45309 amber-700 */
+  --warn: 224 145 43;               /* #E0912B Fair */
 
-  /* Frosted glass — translucent with crisp borders (rgba(0,0,0,0.08)) */
+  /* Frosted glass fill */
   --glass-fill: 255 255 255;
-  --glass-fill-alpha: 0.75;
-  --glass-border-alpha: 0.08;
+  --glass-fill-alpha: 0.85;
+  --glass-border-alpha: 0.12;
 
   /* Specular top-edge highlight */
   --specular-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
 
-  /* 3D elevation stack */
+  /* 3D elevation stack with Bazaar Blue hover glow @ 18% */
   --shadow-3d-sm:
-    0 1px 2px rgba(2, 6, 23, 0.05),
-    0 2px 6px rgba(2, 6, 23, 0.06),
+    0 1px 2px rgba(17, 19, 24, 0.04),
+    0 2px 6px rgba(17, 19, 24, 0.05),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
   --shadow-3d-md:
-    0 4px 10px rgba(2, 6, 23, 0.07),
-    0 12px 24px rgba(2, 6, 23, 0.09),
+    0 4px 12px rgba(17, 19, 24, 0.06),
+    0 12px 24px rgba(17, 19, 24, 0.07),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
   --shadow-3d-lg:
-    0 10px 24px rgba(2, 6, 23, 0.09),
-    0 24px 48px rgba(2, 6, 23, 0.12),
+    0 10px 24px rgba(17, 19, 24, 0.07),
+    0 24px 48px rgba(17, 19, 24, 0.10),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
   --shadow-specular:
-    0 8px 30px rgba(124, 58, 237, 0.2),
+    0 12px 36px rgba(47, 111, 237, 0.18),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
   --shadow-specular-lg:
-    0 16px 48px rgba(124, 58, 237, 0.24),
-    0 4px 16px rgba(236, 72, 153, 0.14),
+    0 20px 50px rgba(47, 111, 237, 0.18),
+    0 4px 16px rgba(47, 111, 237, 0.10),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
 
-  /* Ambient background glow — subtle, radiant purple accents */
+  /* 5-Color System Variables */
+  --ink-navy: 16 19 26;             /* #10131A Navbar, footer, dark-mode bg */
+  --amber: 242 153 74;              /* #F2994A All primary CTA buttons */
+  --amber-deep: 217 123 43;         /* #D97B2B Amber hover/active */
+  --blue: 47 111 237;               /* #2F6FED Links, verified, active cat, chat sent */
+  --success-green: 26 162 96;       /* #1AA260 New condition, deal-closed */
+  --alert-red: 226 76 75;           /* #E24C4B Sold badge, error states */
+  --rating-gold: 242 169 59;        /* #F2A93B Star ratings only */
+
+  /* Ambient background */
   --ambient-bg:
-    radial-gradient(circle at 12% -8%, rgba(124, 58, 237, 0.10), transparent 42%),
-    radial-gradient(circle at 88% 18%, rgba(147, 51, 234, 0.08), transparent 40%),
-    radial-gradient(circle at 50% 100%, rgba(243, 232, 255, 0.65), transparent 55%);
+    radial-gradient(circle at 10% -5%, rgba(47, 111, 237, 0.07), transparent 38%),
+    radial-gradient(circle at 90% 15%, rgba(234, 241, 255, 0.9), transparent 45%),
+    radial-gradient(circle at 50% 100%, rgba(234, 241, 255, 0.6), transparent 50%);
 }
 
 .dark {
   color-scheme: dark;
 
-  /* Surfaces — pure deep obsidian black (#030712 / #09090b) */
-  --surface: 3 7 18;                /* #030712 */
-  --surface-base: 3 7 18;
-  --panel: 9 9 11;                  /* #09090b */
-  --surface-panel: 9 9 11;
-  --surface-elevated: 17 17 23;     /* #111117 */
+  /* Surfaces — Ink Navy background */
+  --surface: 22 26 36;              /* #161A24 Elevated surface on ink navy */
+  --surface-base: 16 19 26;         /* #10131A Ink Navy page background */
+  --panel: 22 26 36;
+  --surface-panel: 22 26 36;
+  --surface-elevated: 30 35 48;
 
-  --line: 255 255 255;
-  --borderline: 255 255 255;
+  /* Border */
+  --line: 42 45 51;                 /* #2A2D33 */
+  --borderline: 42 45 51;
 
-  /* Ink — bright crisp white text (#f8fafc) */
-  --ink: 248 250 252;               /* #f8fafc */
-  --ink-primary: 248 250 252;       /* #f8fafc */
-  --ink-secondary: 226 232 240;     /* #e2e8f0 */
-  --ink-muted: 148 163 184;         /* #94a3b8 */
-  --ink-tertiary: 100 116 139;
+  /* Text / Ink */
+  --ink: 242 243 245;               /* #F2F3F5 Text Primary */
+  --ink-primary: 242 243 245;       /* #F2F3F5 */
+  --ink-secondary: 154 161 172;     /* #9AA1AC Text Secondary */
+  --ink-muted: 154 161 172;         /* #9AA1AC */
+  --ink-tertiary: 107 114 128;
 
-  /* Brand — luminous neon-purple/violet glow accents (#a855f7, #c084fc) */
-  --brand: 168 85 247;              /* #a855f7 neon purple */
-  --brand-soft: 192 132 252;        /* #c084fc violet glow */
-  --brand-deep: 147 51 234;         /* #9333ea */
-  --brand-tint: 59 7 100;           /* #3b0764 deep violet wash */
+  /* Brand — Bazaar Blue with #4F8CFF glow in dark */
+  --brand: 47 111 237;              /* #2F6FED */
+  --brand-soft: 79 140 255;         /* #4F8CFF Dark glow */
+  --brand-deep: 27 79 196;          /* #1B4FC4 */
+  --brand-tint: 26 38 64;           /* Deep blue tint */
 
-  --accent: 232 121 249;            /* #e879f9 fuchsia neon */
-  --accent-soft: 240 171 252;
+  --accent: 79 140 255;             /* #4F8CFF */
+  --accent-soft: 120 170 255;
 
-  --buy: 168 85 247;                /* #a855f7 */
-  --sell: 192 132 252;               /* #c084fc */
-  --sell-ink: 3 7 18;
-  --warn: 251 191 36;               /* amber-400 */
+  --buy: 47 111 237;                /* #2F6FED */
+  --sell: 79 140 255;               /* #4F8CFF */
+  --sell-ink: 13 15 18;
+  --warn: 224 145 43;               /* #E0912B Fair */
 
-  /* Frosted glass — dark translucent with specular neon borders (rgba(255,255,255,0.1)) */
-  --glass-fill: 17 17 23;
-  --glass-fill-alpha: 0.6;
-  --glass-border-alpha: 0.1;
+  /* Frosted glass fill */
+  --glass-fill: 22 24 28;
+  --glass-fill-alpha: 0.75;
+  --glass-border-alpha: 0.15;
 
-  --specular-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+  --specular-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
 
+  /* 3D elevation stack with Dark mode glow: #4F8CFF @ 35% */
   --shadow-3d-sm:
     0 1px 2px rgba(0, 0, 0, 0.6),
     0 2px 8px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
   --shadow-3d-md:
     0 6px 16px rgba(0, 0, 0, 0.65),
     0 16px 32px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
   --shadow-3d-lg:
     0 14px 32px rgba(0, 0, 0, 0.75),
     0 32px 64px rgba(0, 0, 0, 0.7),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
   --shadow-specular:
-    0 8px 30px rgba(168, 85, 247, 0.35),
+    0 12px 40px rgba(79, 140, 255, 0.35),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
   --shadow-specular-lg:
-    0 20px 60px rgba(168, 85, 247, 0.45),
-    0 6px 20px rgba(232, 121, 249, 0.35),
+    0 25px 60px rgba(79, 140, 255, 0.35),
+    0 6px 20px rgba(79, 140, 255, 0.20),
     inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
 
-  /* Ambient background glow — glowing violet/grape radial textures */
+  /* Ambient background */
   --ambient-bg:
-    radial-gradient(circle at 15% -10%, rgba(168, 85, 247, 0.25), transparent 45%),
-    radial-gradient(circle at 85% 15%, rgba(232, 121, 249, 0.16), transparent 42%),
-    radial-gradient(circle at 50% 100%, rgba(76, 29, 149, 0.32), transparent 55%);
+    radial-gradient(circle at 15% -10%, rgba(47, 111, 237, 0.14), transparent 45%),
+    radial-gradient(circle at 85% 15%, rgba(79, 140, 255, 0.10), transparent 42%),
+    radial-gradient(circle at 50% 100%, rgba(27, 79, 196, 0.18), transparent 55%);
 }
 
 /* ============================================================
@@ -213,12 +257,14 @@ body,
 }
 
 body {
-  @apply bg-surface text-ink antialiased;
+  background-color: rgb(var(--surface-base));
+  color: rgb(var(--ink));
   background-image: var(--ambient-bg);
   background-attachment: fixed;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
   transition:
-    background-color 0.4s cubic-bezier(0.22, 1, 0.36, 1),
-    color 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    background-color 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* ============================================================
@@ -229,7 +275,7 @@ body {
   background-color: rgba(var(--glass-fill), var(--glass-fill-alpha));
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(var(--borderline), var(--glass-border-alpha));
+  border: 1px solid rgba(var(--borderline), 1);
 }
 
 .apple-glass-thin {
@@ -239,7 +285,7 @@ body {
   );
   backdrop-filter: blur(14px) saturate(160%);
   -webkit-backdrop-filter: blur(14px) saturate(160%);
-  border: 1px solid rgba(var(--borderline), var(--glass-border-alpha));
+  border: 1px solid rgba(var(--borderline), 1);
 }
 
 /* ============================================================
@@ -248,7 +294,7 @@ body {
 
 .specular-border {
   position: relative;
-  border: 1px solid rgba(var(--borderline), var(--glass-border-alpha));
+  border: 1px solid rgba(var(--borderline), 1);
   box-shadow: var(--specular-highlight);
 }
 
@@ -261,7 +307,7 @@ body {
   pointer-events: none;
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.35),
+    rgba(255, 255, 255, 0.25),
     rgba(255, 255, 255, 0) 40%
   );
   -webkit-mask:
@@ -269,7 +315,7 @@ body {
     linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
 /* ============================================================
@@ -284,7 +330,7 @@ body {
   outline: none;
 }
 .focus-ring:focus-visible {
-  box-shadow: 0 0 0 3px rgba(var(--brand), 0.45);
+  box-shadow: 0 0 0 3px rgba(var(--brand), 0.35);
 }
 
 .press-feedback {

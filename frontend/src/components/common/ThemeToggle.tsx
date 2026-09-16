@@ -27,7 +27,7 @@ export function ThemeToggle() {
         backdrop-blur-xl
         shadow-3d-sm
         transition-all duration-300
-        hover:border-purple-500/50 hover:shadow-specular
+        hover:border-[#2F6FED]/50 hover:shadow-specular
         focus-ring
       "
     >
@@ -46,8 +46,8 @@ export function ThemeToggle() {
           transition={SPRING}
           className={`relative z-10 flex items-center justify-center ${
             isDark
-              ? 'text-purple-300 drop-shadow-[0_0_8px_rgba(192,132,252,0.75)]'
-              : 'text-purple-600 drop-shadow-[0_0_6px_rgba(124,58,237,0.35)]'
+              ? 'text-[#4F8CFF] drop-shadow-[0_0_8px_rgba(79,140,255,0.75)]'
+              : 'text-[#2F6FED] drop-shadow-[0_0_6px_rgba(47,111,237,0.35)]'
           }`}
         >
           {isDark ? (

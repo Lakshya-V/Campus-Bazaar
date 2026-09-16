@@ -16,6 +16,7 @@ import {
 import type {
   User,
   Item,
+  Category,
   ChatSession,
   Message,
   WishlistItem,
@@ -62,7 +63,8 @@ interface MarketContextValue {
   markItemSold: (itemId: string, winningBuyerId?: string) => void;
   incrementItemView: (itemId: string) => void;
 
-  categories: typeof INITIAL_CATEGORIES;
+  categories: Category[];
+  addCategory: (name: string) => Category;
 
   // Wishlist
   wishlist: WishlistItem[];
@@ -80,7 +82,11 @@ interface MarketContextValue {
   getSessionById: (sessionId: string) => ChatSession | undefined;
   getMessagesForSession: (sessionId: string) => Message[];
   startChatSession: (itemId: string, sellerId: string) => ChatSession;
-  sendMessage: (sessionId: string, text: string) => Message;
+  sendMessage: (
+    sessionId: string,
+    text: string,
+    media?: { type: 'image' | 'video'; url: string }
+  ) => Message;
 
   // Ratings
   ratings: Rating[];
@@ -103,6 +109,7 @@ const STORAGE_KEYS = {
   WISHLIST: 'campus_bazaar_wishlist_v2',
   RATINGS: 'campus_bazaar_ratings_v2',
   RECENT: 'campus_bazaar_recent_v2',
+  CATEGORIES: 'campus_bazaar_categories_v2',
 };
 
 function loadFromStorage<T>(key: string, fallback: T): T {
@@ -120,6 +127,10 @@ function loadFromStorage<T>(key: string, fallback: T): T {
 export function MarketProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const currentUserId = user?.User_ID || 'user_alex';
+
+  const [categories, setCategories] = useState<Category[]>(() =>
+    loadFromStorage(STORAGE_KEYS.CATEGORIES, INITIAL_CATEGORIES)
+  );
 
   const [users, setUsers] = useState<User[]>(() =>
     loadFromStorage(STORAGE_KEYS.USERS, INITIAL_USERS)
@@ -177,6 +188,29 @@ export function MarketProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.RECENT, JSON.stringify(recentlyViewedIds));
   }, [recentlyViewedIds]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories));
+  }, [categories]);
+
+  const addCategory = useCallback((name: string): Category => {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      return INITIAL_CATEGORIES[0];
+    }
+    const existing = categories.find(
+      (c) => c.Name.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (existing) {
+      return existing;
+    }
+    const newCat: Category = {
+      Category_ID: `cat_${Date.now()}`,
+      Name: trimmed,
+    };
+    setCategories((prev) => [...prev, newCat]);
+    return newCat;
+  }, [categories]);
 
   const getUser = useCallback(
     (userId: string) => users.find((u) => u.User_ID === userId),
@@ -342,13 +376,18 @@ export function MarketProvider({ children }: { children: ReactNode }) {
   );
 
   const sendMessage = useCallback(
-    (sessionId: string, text: string): Message => {
+    (
+      sessionId: string,
+      text: string,
+      media?: { type: 'image' | 'video'; url: string }
+    ): Message => {
       const newMsg: Message = {
         Message_ID: `msg_${Date.now()}`,
         Session_ID: sessionId,
         Sender_ID: currentUserId,
         Text: text.trim(),
         Timestamp: new Date().toISOString(),
+        ...(media ? { MediaType: media.type, MediaUrl: media.url } : {}),
       };
       setMessages((prev) => [...prev, newMsg]);
       return newMsg;
@@ -455,7 +494,8 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       addItem,
       markItemSold,
       incrementItemView,
-      categories: INITIAL_CATEGORIES,
+      categories,
+      addCategory,
       wishlist,
       toggleWishlist,
       isWishlisted,
@@ -483,6 +523,8 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       addItem,
       markItemSold,
       incrementItemView,
+      categories,
+      addCategory,
       wishlist,
       toggleWishlist,
       isWishlisted,

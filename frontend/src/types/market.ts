@@ -51,6 +51,8 @@ export interface Message {
   Sender_ID: string;
   Text: string;
   Timestamp: string;
+  MediaType?: 'text' | 'image' | 'video';
+  MediaUrl?: string;
 }
 
 export interface WishlistItem {

@@ -1,42 +1,55 @@
 // src/pages/HomePage.tsx
-import { useState, useMemo } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
-  Sparkles,
   ArrowUpDown,
-  SlidersHorizontal,
-  Clock,
+  ArrowRight,
   RotateCcw,
-  Plus,
-  Eye,
+  SlidersHorizontal,
+  Laptop,
+  BookOpen,
+  Armchair,
+  Coffee,
+  Bike,
+  Layers,
 } from 'lucide-react';
 import { useMarket } from '../context/MarketContext';
 import ListingCard from '../components/listings/ListingCard';
+import FeaturedSpotlightCarousel from '../components/home/FeaturedSpotlightCarousel';
+import BudgetRangeSlider from '../components/home/BudgetRangeSlider';
+import MarketplaceFooter from '../components/layout/MarketplaceFooter';
+import { CATEGORY_METAS, getCategorySlug } from '../data/mockMarketData';
 import { PAGE_VARIANTS } from '../lib/motion';
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'views';
 
+const CATEGORY_ICONS: Record<string, React.ElementType> = {
+  'electronics-tech': Laptop,
+  textbooks: BookOpen,
+  'dorm-furniture': Armchair,
+  appliances: Coffee,
+  'transport-sports': Bike,
+};
+
 export default function HomePage() {
-  const { items, categories, recentlyViewedIds, getItem } = useMarket();
+  const navigate = useNavigate();
+  const { items, categories } = useMarket();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const selectedCategory = searchParams.get('category') || 'All Categories';
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, []);
+
   const searchQuery = searchParams.get('q') || '';
-
   const [sortBy, setSortBy] = useState<SortOption>('newest');
-  const [priceFilter, setPriceFilter] = useState<'all' | 'under50' | '50to150' | 'over150'>('all');
+  // Interactive budget limit: 500 = All Prices (no upper cap)
+  const [maxBudget, setMaxBudget] = useState<number>(500);
 
-  // Compute filtered & sorted items
+  // Filter & sort items across all categories
   const filteredItems = useMemo(() => {
     return items
-      .filter((item) => item.Status === 'AVAILABLE') // Only AVAILABLE items in public grid
-      .filter((item) => {
-        if (selectedCategory !== 'All Categories' && selectedCategory !== 'cat_all') {
-          return item.Category.toLowerCase() === selectedCategory.toLowerCase();
-        }
-        return true;
-      })
+      .filter((item) => item.Status === 'AVAILABLE')
       .filter((item) => {
         if (!searchQuery.trim()) return true;
         const q = searchQuery.toLowerCase();
@@ -47,47 +60,72 @@ export default function HomePage() {
         );
       })
       .filter((item) => {
-        if (priceFilter === 'under50') return item.Price < 50;
-        if (priceFilter === '50to150') return item.Price >= 50 && item.Price <= 150;
-        if (priceFilter === 'over150') return item.Price > 150;
+        if (maxBudget < 500) {
+          return item.Price <= maxBudget;
+        }
         return true;
       })
       .sort((a, b) => {
         if (sortBy === 'price_asc') return a.Price - b.Price;
         if (sortBy === 'price_desc') return b.Price - a.Price;
         if (sortBy === 'views') return b.ViewCount - a.ViewCount;
-        // Default newest
         return new Date(b.PostedAt).getTime() - new Date(a.PostedAt).getTime();
       });
-  }, [items, selectedCategory, searchQuery, priceFilter, sortBy]);
+  }, [items, searchQuery, maxBudget, sortBy]);
 
-  // Recently viewed items list
-  const recentlyViewedItems = useMemo(() => {
-    return recentlyViewedIds
-      .map((id) => getItem(id))
-      .filter((item): item is NonNullable<typeof item> => item !== undefined);
-  }, [recentlyViewedIds, getItem]);
+  // Group filtered items by category, capped at 4 items per category row
+  const categorySections = useMemo(() => {
+    return categories
+      .filter((cat) => cat.Name !== 'All Categories')
+      .map((cat) => {
+        const foundMeta = CATEGORY_METAS.find(
+          (m) => m.name.toLowerCase() === cat.Name.toLowerCase() || m.id === cat.Category_ID
+        );
+        const meta = foundMeta || {
+          id: cat.Category_ID,
+          slug: getCategorySlug(cat.Name),
+          name: cat.Name,
+          description: `Browse student listings in ${cat.Name}.`,
+        };
 
-  function handleCategoryChange(catName: string) {
-    const next = new URLSearchParams(searchParams);
-    if (catName === 'All Categories') {
-      next.delete('category');
+        const allAvailableInCat = items.filter(
+          (item) =>
+            item.Status === 'AVAILABLE' &&
+            item.Category.toLowerCase() === cat.Name.toLowerCase()
+        );
+
+        const matchingFiltered = filteredItems.filter(
+          (item) => item.Category.toLowerCase() === cat.Name.toLowerCase()
+        );
+
+        return {
+          meta,
+          totalAvailable: allAvailableInCat.length,
+          items: matchingFiltered.slice(0, 4), // Capped preview row: max 4 items
+          hasMatches: matchingFiltered.length > 0,
+        };
+      });
+  }, [categories, items, filteredItems]);
+
+  function handleCategoryPillClick(catName: string) {
+    if (catName === 'All Categories' || catName === 'cat_all') {
+      // Stay on HomePage discovery preview
+      navigate('/');
     } else {
-      next.set('category', catName);
+      // Direct navigation to dedicated /category/:categoryId full view
+      const slug = getCategorySlug(catName);
+      navigate(`/category/${slug}`);
     }
-    setSearchParams(next, { replace: true });
   }
 
   function handleClearFilters() {
-    setPriceFilter('all');
+    setMaxBudget(500);
     setSortBy('newest');
     setSearchParams({}, { replace: true });
   }
 
-  const hasActiveFilters =
-    selectedCategory !== 'All Categories' ||
-    searchQuery.trim() !== '' ||
-    priceFilter !== 'all';
+  const hasActiveFilters = searchQuery.trim() !== '' || maxBudget < 500;
+  const hasAnyMatches = categorySections.some((sec) => sec.hasMatches);
 
   return (
     <motion.div
@@ -95,205 +133,172 @@ export default function HomePage() {
       initial="initial"
       animate="animate"
       exit="exit"
-      className="space-y-8 pb-16"
+      className="space-y-10 pb-12"
     >
-      {/* Header Banner */}
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div>
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/20 bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300">
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>Verified Peer-to-Peer Campus Marketplace</span>
-          </div>
-          <h1 className="mt-2 font-display text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">
-            Browse the bazaar
-          </h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            Textbooks, dorm furniture, and tech essentials direct from verified students.
-          </p>
+      {/* ═══════════════════════════════════════════════════════════════
+          1. HERO HEADING — CENTER-ALIGNED
+          ═══════════════════════════════════════════════════════════════ */}
+      <div className="flex flex-col items-center justify-center text-center py-3">
+        <div className="inline-flex items-center rounded-full px-3.5 py-1 text-[10px] font-semibold uppercase tracking-wider bg-[#111318] text-[#FFFFFF] dark:bg-[#F2F3F5] dark:text-[#0D0F12] border border-borderline mb-3 shadow-xs">
+          Campus Marketplace · Verified Students
         </div>
-
-        {/* Quick Post an Item CTA in Header */}
-        <Link
-          to="/sell/new"
-          className="inline-flex items-center gap-2 self-start rounded-2xl bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-purple-700 active:scale-95 dark:bg-purple-600 dark:hover:bg-purple-500 md:self-auto"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Post an Item</span>
-        </Link>
+        <h1 className="font-display text-4xl font-bold tracking-tight text-ink sm:text-6xl text-center leading-tight">
+          Browse the bazaar
+        </h1>
+        <p className="mt-3 text-sm sm:text-base text-ink-muted max-w-xl font-body text-center mx-auto leading-relaxed">
+          Textbooks, dorm furniture, and tech essentials direct from verified students across campus.
+        </p>
       </div>
 
-      {/* Category Pills Filter Bar */}
-      <div className="no-scrollbar flex items-center gap-2 overflow-x-auto pb-1">
-        {categories.map((cat) => {
-          const isSelected = selectedCategory === cat.Name;
+      {/* ═══════════════════════════════════════════════════════════════
+          2. CAMPUS SPOTLIGHT CAROUSEL (Directly below hero heading)
+          ═══════════════════════════════════════════════════════════════ */}
+      {!hasActiveFilters && items.length > 0 && (
+        <FeaturedSpotlightCarousel items={items} autoAdvanceSeconds={13} />
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════
+          3. CATEGORY PILLS & FILTERS
+          ═══════════════════════════════════════════════════════════════ */}
+      <div className="space-y-4">
+        {/* Category Navigation Pills */}
+        <div className="no-scrollbar flex items-center gap-2 overflow-x-auto pb-1">
+          {categories.map((cat) => {
+            const isAll = cat.Name === 'All Categories';
+            return (
+              <button
+                key={cat.Category_ID}
+                type="button"
+                onClick={() => handleCategoryPillClick(cat.Name)}
+                className={`flex-shrink-0 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
+                  isAll
+                    ? 'bg-[#2F6FED] text-white shadow-sm'
+                    : 'border border-borderline bg-surface text-ink hover:bg-surface-elevated'
+                }`}
+              >
+                {cat.Name}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Filter Controls Bar: Interactive Budget Slider & Sort Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-borderline bg-surface/90 p-3 sm:px-5 sm:py-3 shadow-sm backdrop-blur-xl">
+          {/* Draggable Budget Range Slider */}
+          <BudgetRangeSlider
+            value={maxBudget}
+            onChange={(val) => setMaxBudget(val)}
+          />
+
+          {/* Right: Sticky Sort Segmented Control */}
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-ink-muted mr-1">
+              <ArrowUpDown className="h-3 w-3" />
+              Sort:
+            </span>
+            <div className="flex items-center gap-1 rounded-full border border-borderline bg-surface-base p-1">
+              {[
+                { id: 'newest', label: 'Newest' },
+                { id: 'price_asc', label: 'Price: Low-High' },
+                { id: 'price_desc', label: 'Price: High-Low' },
+                { id: 'views', label: 'Most Viewed' },
+              ].map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSortBy(s.id as SortOption)}
+                  className={`rounded-full px-3 py-1 text-[11px] font-medium transition-all cursor-pointer ${
+                    sortBy === s.id
+                      ? 'bg-[#111318] text-[#FFFFFF] dark:bg-[#F2F3F5] dark:text-[#0D0F12] font-semibold shadow-xs'
+                      : 'text-ink-muted hover:text-ink'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════
+          4. CAPPED PREVIEW ROWS PER CATEGORY (Replaces single long grid)
+          ═══════════════════════════════════════════════════════════════ */}
+      <div className="space-y-12">
+        {categorySections.map(({ meta, totalAvailable, items: catItems, hasMatches }) => {
+          if (!hasMatches) return null;
+          const Icon = CATEGORY_ICONS[meta.slug] || Layers;
+
           return (
-            <button
-              key={cat.Category_ID}
-              type="button"
-              onClick={() => handleCategoryChange(cat.Name)}
-              className={`flex-shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                isSelected
-                  ? 'bg-purple-600 text-white shadow-sm dark:bg-purple-600'
-                  : 'border border-black/8 bg-white/70 text-ink hover:border-purple-500/30 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10'
-              }`}
+            <section
+              key={meta.id}
+              aria-label={`${meta.name} listings preview`}
+              className="space-y-4"
             >
-              {cat.Name}
-            </button>
+              {/* Category Section Header with "View all" action */}
+              <div className="flex items-center justify-between border-b border-borderline pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#2F6FED]/10 text-[#2F6FED] dark:text-[#4F8CFF]">
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <h2 className="font-display text-lg font-bold text-ink sm:text-xl">
+                    {meta.name}
+                  </h2>
+                  <span className="rounded-full bg-surface-elevated border border-borderline px-2.5 py-0.5 text-[11px] font-semibold text-ink-muted">
+                    {totalAvailable} {totalAvailable === 1 ? 'item' : 'items'}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => navigate(`/category/${meta.slug}`)}
+                  className="group inline-flex items-center gap-1.5 text-xs font-semibold text-[#2F6FED] hover:text-[#1A54D4] dark:text-[#4F8CFF] dark:hover:text-[#70A5FF] transition-colors cursor-pointer"
+                >
+                  <span>View all in {meta.name}</span>
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                </button>
+              </div>
+
+              {/* Capped 4-Item Preview Grid */}
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                {catItems.map((item) => (
+                  <div key={item.Item_ID} className="h-full">
+                    <ListingCard item={item} />
+                  </div>
+                ))}
+              </div>
+            </section>
           );
         })}
       </div>
 
-      {/* Sticky Sort & Filter Bar */}
-      <div className="sticky top-[61px] z-30 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-black/8 bg-white/85 p-3 shadow-md backdrop-blur-xl dark:border-white/10 dark:bg-[#09090b]/85">
-        {/* Left: Price Filter Pills */}
-        <div className="flex items-center gap-1.5 text-xs">
-          <span className="flex items-center gap-1 font-semibold text-ink-muted mr-1">
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            Budget:
-          </span>
-          {[
-            { id: 'all', label: 'All' },
-            { id: 'under50', label: '< $50' },
-            { id: '50to150', label: '$50 – $150' },
-            { id: 'over150', label: '> $150' },
-          ].map((pf) => (
-            <button
-              key={pf.id}
-              type="button"
-              onClick={() => setPriceFilter(pf.id as typeof priceFilter)}
-              className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
-                priceFilter === pf.id
-                  ? 'bg-black/10 text-ink font-semibold dark:bg-white/15'
-                  : 'text-ink-muted hover:text-ink'
-              }`}
-            >
-              {pf.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Right: Sticky Sort Bar */}
-        <div className="flex items-center gap-1 text-xs">
-          <span className="flex items-center gap-1 font-semibold text-ink-muted mr-1">
-            <ArrowUpDown className="h-3.5 w-3.5" />
-            Sort:
-          </span>
-          {[
-            { id: 'newest', label: 'Newest' },
-            { id: 'price_asc', label: 'Price: Low-High' },
-            { id: 'price_desc', label: 'Price: High-Low' },
-            { id: 'views', label: 'Most Viewed' },
-          ].map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setSortBy(s.id as SortOption)}
-              className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
-                sortBy === s.id
-                  ? 'bg-purple-600 text-white font-semibold shadow-sm'
-                  : 'text-ink-muted hover:text-ink'
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Grid of ItemCards (with Apple3DCard treatment) */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        <AnimatePresence mode="popLayout">
-          {filteredItems.map((item) => (
-            <ListingCard key={item.Item_ID} item={item} />
-          ))}
-        </AnimatePresence>
-      </div>
-
-      {/* Empty Filter State */}
-      {filteredItems.length === 0 && (
-        <div className="rounded-3xl border border-dashed border-black/10 bg-black/[0.01] py-16 text-center dark:border-white/15 dark:bg-white/[0.01]">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+      {/* Empty Filter State (if no categories match criteria) */}
+      {!hasAnyMatches && (
+        <div className="rounded-3xl border border-dashed border-borderline bg-black/[0.01] py-16 text-center dark:bg-white/[0.01]">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2F6FED]/10 text-[#2F6FED] dark:text-[#4F8CFF]">
             <SlidersHorizontal className="h-6 w-6" />
           </div>
           <h3 className="mt-4 font-display text-lg font-bold text-ink">
             No campus listings match your criteria
           </h3>
           <p className="mt-1 text-sm text-ink-muted">
-            Try adjusting your search query, price bracket, or category filter.
+            Try adjusting your search query, budget slider, or category filter.
           </p>
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={handleClearFilters}
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-purple-700"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Clear all filters
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleClearFilters}
+            className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-borderline bg-surface px-4 py-2 text-xs font-semibold text-ink shadow-xs transition-colors hover:bg-surface-elevated cursor-pointer"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Reset all filters
+          </button>
         </div>
       )}
 
-      {/* "Recently Viewed" Horizontal Row */}
-      {recentlyViewedItems.length > 0 && (
-        <div className="pt-6 border-t border-black/8 dark:border-white/10">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-              <h2 className="font-display text-base font-bold text-ink">
-                Recently Viewed on Campus
-              </h2>
-            </div>
-            <span className="text-xs text-ink-muted">In this session</span>
-          </div>
-
-          <div className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
-            {recentlyViewedItems.map((item) => (
-              <Link
-                key={item.Item_ID}
-                to={`/item/${item.Item_ID}`}
-                className="group flex w-60 flex-shrink-0 items-center gap-3 rounded-2xl border border-black/8 bg-surface-elevated p-2.5 transition-all hover:border-purple-500/40 hover:shadow-md dark:border-white/10"
-              >
-                <img
-                  src={item.Images[0]}
-                  alt={item.Title}
-                  className="h-14 w-14 rounded-xl object-cover flex-shrink-0 group-hover:scale-105 transition-transform"
-                />
-                <div className="min-w-0 flex-1">
-                  <h4 className="truncate text-xs font-semibold text-ink group-hover:text-purple-600 dark:group-hover:text-purple-400">
-                    {item.Title}
-                  </h4>
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="font-display text-sm font-bold text-sell">
-                      ${item.Price}
-                    </span>
-                    <span className="flex items-center gap-1 text-[10px] text-ink-muted">
-                      <Eye className="h-3 w-3" />
-                      {item.ViewCount}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Floating Action Button (FAB) for quick post */}
-      <motion.div
-        whileHover={{ scale: 1.06 }}
-        whileTap={{ scale: 0.94 }}
-        className="fixed bottom-6 right-6 z-40"
-      >
-        <Link
-          to="/sell/new"
-          aria-label="Post an item"
-          className="flex items-center gap-2 rounded-full bg-purple-600 px-5 py-3 text-sm font-bold text-white shadow-2xl shadow-purple-600/50 transition-all hover:bg-purple-700"
-        >
-          <Plus className="h-5 w-5" strokeWidth={2.5} />
-          <span>Post an Item</span>
-        </Link>
-      </motion.div>
+      {/* ═══════════════════════════════════════════════════════════════
+          5. BOTTOM FOOTER SEQUENCE (Rules -> About/Credits -> Quotes -> Marquee)
+          ═══════════════════════════════════════════════════════════════ */}
+      <MarketplaceFooter />
     </motion.div>
   );
 }

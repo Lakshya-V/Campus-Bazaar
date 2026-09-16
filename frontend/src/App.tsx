@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
 import { MarketProvider } from './context/MarketContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { CartSwipeProvider } from './context/CartSwipeContext';
+import ScrollToTop from './components/common/ScrollToTop';
 import AppRoutes from './router/AppRoutes';
 
 const queryClient = new QueryClient({
@@ -22,7 +24,10 @@ export default function App() {
         <AuthProvider>
           <MarketProvider>
             <BrowserRouter>
-              <AppRoutes />
+              <ScrollToTop />
+              <CartSwipeProvider>
+                <AppRoutes />
+              </CartSwipeProvider>
             </BrowserRouter>
           </MarketProvider>
         </AuthProvider>

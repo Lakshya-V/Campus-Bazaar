@@ -109,7 +109,7 @@ export default function SearchAutocomplete({
           }}
           onKeyDown={handleKeyDown}
           placeholder="Search textbooks, calculators, dorm gear..."
-          className="w-full rounded-2xl border border-black/10 bg-white/70 py-2 pl-10 pr-9 text-sm text-ink placeholder-ink-muted/60 backdrop-blur-md transition-all duration-200 focus:border-purple-500 focus:bg-white focus:shadow-[0_0_16px_rgba(168,85,247,0.15)] focus:outline-none dark:border-white/10 dark:bg-black/40 dark:focus:border-purple-400 dark:focus:bg-black/80"
+          className="w-full rounded-2xl border border-borderline bg-surface/70 py-2 pl-10 pr-9 text-sm text-ink placeholder-ink-muted/60 backdrop-blur-md transition-all duration-200 focus:border-[#2F6FED] focus:bg-surface focus:shadow-[0_0_16px_rgba(47,111,237,0.18)] focus:outline-none dark:focus:border-[#4F8CFF] dark:focus:shadow-[0_0_16px_rgba(79,140,255,0.25)]"
         />
         {query && (
           <button
@@ -128,7 +128,7 @@ export default function SearchAutocomplete({
 
       {/* Autocomplete Dropdown */}
       {isOpen && cleanQ && allSuggestions.length > 0 && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-black/10 bg-white/95 p-1.5 shadow-2xl backdrop-blur-2xl dark:border-white/15 dark:bg-[#09090b]/95">
+        <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-borderline bg-surface/95 p-1.5 shadow-2xl backdrop-blur-2xl">
           <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
             Suggestions (↑↓ navigate, ↵ select)
           </div>
@@ -149,7 +149,7 @@ export default function SearchAutocomplete({
                       }}
                       className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-colors ${
                         isSelected
-                          ? 'bg-purple-600 text-white dark:bg-purple-600'
+                          ? 'bg-[#2F6FED] text-white'
                           : 'text-ink hover:bg-black/5 dark:hover:bg-white/5'
                       }`}
                     >
@@ -177,7 +177,7 @@ export default function SearchAutocomplete({
                     }}
                     className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-colors ${
                       isSelected
-                        ? 'bg-purple-600 text-white dark:bg-purple-600'
+                        ? 'bg-[#2F6FED] text-white'
                         : 'text-ink hover:bg-black/5 dark:hover:bg-white/5'
                     }`}
                   >

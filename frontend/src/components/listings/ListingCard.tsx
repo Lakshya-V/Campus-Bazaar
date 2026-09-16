@@ -2,22 +2,23 @@
 import { type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Heart, ShieldCheck, Tag } from 'lucide-react';
+import { Heart, ShieldCheck } from 'lucide-react';
 import type { Item, ListingCondition } from '../../types/market';
 import { Apple3DCard } from '../common/Apple3DCard';
 import { useAuth } from '../../context/AuthContext';
 import { useMarket } from '../../context/MarketContext';
 import { POP_SPRING } from '../../lib/motion';
 import RatingStars from '../common/RatingStars';
+import { useCartSwipe } from '../../context/CartSwipeContext';
 
 interface ListingCardProps {
   item: Item;
 }
 
 const CONDITION_STYLES: Record<ListingCondition, string> = {
-  new: 'bg-emerald-700 text-white border-emerald-800 dark:bg-emerald-500 dark:text-emerald-950 dark:border-emerald-400',
-  good: 'bg-slate-700 text-white border-slate-800 dark:bg-slate-200 dark:text-slate-900 dark:border-slate-300',
-  fair: 'bg-amber-700 text-white border-amber-800 dark:bg-amber-400 dark:text-amber-950 dark:border-amber-300',
+  new: 'bg-[#1AA260] text-white border-[#15824d]',
+  good: 'bg-[#2F6FED] text-white border-[#2358c2]',
+  fair: 'bg-[#E0912B] text-white border-[#b8731d]',
 };
 
 const CONDITION_LABEL: Record<ListingCondition, string> = {
@@ -29,6 +30,7 @@ const CONDITION_LABEL: Record<ListingCondition, string> = {
 export default function ListingCard({ item }: ListingCardProps) {
   const { user } = useAuth();
   const { getUser, isWishlisted, toggleWishlist } = useMarket();
+  const { triggerCartSwipe } = useCartSwipe();
 
   const isFavorited = isWishlisted(item.Item_ID);
   const isOwnListing = user?.User_ID === item.Seller_ID;
@@ -38,6 +40,11 @@ export default function ListingCard({ item }: ListingCardProps) {
     e.preventDefault();
     e.stopPropagation();
     toggleWishlist(item.Item_ID);
+  }
+
+  function handleCardClick(e: MouseEvent) {
+    e.preventDefault();
+    triggerCartSwipe(`/item/${item.Item_ID}`);
   }
 
   const coverImage = item.Images[0];
@@ -58,12 +65,13 @@ export default function ListingCard({ item }: ListingCardProps) {
     >
       <Link
         to={`/item/${item.Item_ID}`}
-        className="block h-full outline-none focus-visible:ring-2 focus-visible:ring-purple-500 rounded-3xl"
+        onClick={handleCardClick}
+        className="block h-full outline-none focus-visible:ring-2 focus-visible:ring-[#2F6FED] rounded-2xl cursor-pointer"
       >
-        <Apple3DCard className="h-full">
+        <Apple3DCard className="h-full rounded-2xl">
           {/* Layer 1: Background & image layer — translateZ(0) */}
           <div
-            className="relative aspect-[4/3] overflow-hidden rounded-t-3xl bg-surface-elevated"
+            className="relative aspect-[4/3] overflow-hidden rounded-t-2xl bg-surface-elevated"
             style={{ transform: 'translateZ(0px)', transformStyle: 'preserve-3d' }}
           >
             {coverImage ? (
@@ -82,10 +90,10 @@ export default function ListingCard({ item }: ListingCardProps) {
             {/* "Your listing" indicator pill */}
             {isOwnListing && (
               <span
-                className="absolute left-3 top-3 z-30 rounded-full border border-purple-500/30 bg-purple-900/80 px-2.5 py-1 text-[11px] font-bold text-purple-200 backdrop-blur-md shadow-md"
+                className="absolute left-3 top-3 z-30 rounded-full border border-borderline bg-[#111318] text-[#FFFFFF] dark:bg-[#F2F3F5] dark:text-[#0D0F12] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider backdrop-blur-md shadow-sm"
                 style={{ transform: 'translateZ(30px)' }}
               >
-                Your listing
+                YOUR LISTING
               </span>
             )}
 
@@ -98,14 +106,14 @@ export default function ListingCard({ item }: ListingCardProps) {
               onClick={handleToggleFavorite}
               aria-pressed={isFavorited}
               aria-label={isFavorited ? 'Remove from saved' : 'Save item'}
-              className="absolute right-3 top-3 z-30 flex h-8 w-8 items-center justify-center rounded-full border border-black/10 dark:border-white/15 bg-white/80 dark:bg-black/60 backdrop-blur-md transition-colors"
+              className="absolute right-3 top-3 z-30 flex h-8 w-8 items-center justify-center rounded-full border border-borderline bg-surface/85 backdrop-blur-md transition-colors"
               style={{ transform: 'translateZ(30px)' }}
             >
               <Heart
                 className={`h-4 w-4 transition-colors ${
                   isFavorited
-                    ? 'fill-purple-600 text-purple-600 dark:fill-purple-400 dark:text-purple-400'
-                    : 'text-slate-700 dark:text-white'
+                    ? 'fill-[#2F6FED] text-[#2F6FED] dark:fill-[#4F8CFF] dark:text-[#4F8CFF]'
+                    : 'text-ink-secondary'
                 }`}
               />
             </motion.button>
@@ -117,7 +125,7 @@ export default function ListingCard({ item }: ListingCardProps) {
             style={{ transform: 'translateZ(35px)', transformStyle: 'preserve-3d' }}
           >
             <h3
-              className="truncate font-semibold text-ink group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors"
+              className="truncate font-semibold text-ink transition-colors group-hover:text-ink-primary text-sm"
               style={{ transform: 'translateZ(35px)' }}
             >
               {item.Title}
@@ -136,7 +144,7 @@ export default function ListingCard({ item }: ListingCardProps) {
                 />
                 <span className="truncate">{seller?.Name || 'Campus Peer'}</span>
                 {seller?.IsVerified && (
-                  <ShieldCheck className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
+                  <ShieldCheck className="h-3.5 w-3.5 text-[#2F6FED] flex-shrink-0" />
                 )}
               </div>
               {seller && (
@@ -148,31 +156,41 @@ export default function ListingCard({ item }: ListingCardProps) {
 
             {/* Bottom metadata row */}
             <div
-              className="flex items-center justify-between gap-2 pt-1 border-t border-black/5 dark:border-white/5"
+              className="flex items-center justify-between gap-2 pt-2 border-t border-[#E7E9EC] dark:border-[#2A2D33]"
               style={{ transformStyle: 'preserve-3d' }}
             >
               {/* Layer 3: Price tag — translateZ(55px) (floating highest) */}
               <span
-                className="font-display text-xl font-bold tabular-nums text-sell"
+                className="font-display text-xl font-bold tracking-tight tabular-nums text-ink"
                 style={{ transform: 'translateZ(55px)' }}
               >
                 ${item.Price}
               </span>
 
-              {/* Category label and condition badge flush directly adjacent to each other */}
+              {/* Category label, photo count, and condition/sold badge flush directly adjacent to each other */}
               <div
                 className="flex items-center gap-1.5"
                 style={{ transform: 'translateZ(35px)' }}
               >
-                <span className="text-xs font-medium text-ink-muted flex items-center gap-1">
-                  <Tag className="h-3 w-3 opacity-60" />
+                {item.Images.length > 1 && (
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-surface-elevated text-ink-muted border border-borderline">
+                    📷 {item.Images.length}
+                  </span>
+                )}
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-surface-elevated text-ink-secondary border border-borderline">
                   {item.Category}
                 </span>
-                <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border shadow-sm ${CONDITION_STYLES[item.Condition]}`}
-                >
-                  {CONDITION_LABEL[item.Condition]}
-                </span>
+                {item.Status === 'SOLD' ? (
+                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-[#E24C4B] text-white border border-[#b83332] shadow-sm">
+                    SOLD
+                  </span>
+                ) : (
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider border shadow-sm ${CONDITION_STYLES[item.Condition]}`}
+                  >
+                    {CONDITION_LABEL[item.Condition]}
+                  </span>
+                )}
               </div>
             </div>
           </div>

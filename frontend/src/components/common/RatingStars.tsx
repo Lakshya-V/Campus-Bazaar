@@ -38,7 +38,7 @@ export default function RatingStars({
                 style={{ width: size, height: size }}
                 className={
                   isFilled
-                    ? 'fill-amber-400 text-amber-400 drop-shadow-[0_1px_2px_rgba(251,191,36,0.4)]'
+                    ? 'fill-[#F2A93B] text-[#F2A93B] drop-shadow-[0_1px_2px_rgba(242,169,59,0.4)]'
                     : 'fill-slate-200 text-slate-300 dark:fill-slate-800 dark:text-slate-700'
                 }
               />
@@ -61,7 +61,7 @@ export default function RatingStars({
                 style={{ width: size, height: size }}
                 className={`transition-colors duration-150 ${
                   isFilled
-                    ? 'fill-amber-400 text-amber-400 drop-shadow-[0_2px_6px_rgba(251,191,36,0.5)]'
+                    ? 'fill-[#F2A93B] text-[#F2A93B] drop-shadow-[0_2px_6px_rgba(242,169,59,0.5)]'
                     : 'fill-slate-200 text-slate-300 dark:fill-slate-800 dark:text-slate-700'
                 }`}
               />

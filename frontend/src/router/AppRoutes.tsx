@@ -7,6 +7,8 @@ import ListingDetailPage from '../pages/ListingDetailPage';
 import LoginPage from '../pages/LoginPage';
 import CreateListingPage from '../pages/CreateListingPage';
 import ChatPage from '../pages/ChatPage';
+import ProfilePage from '../pages/ProfilePage';
+import CategoryPage from '../pages/CategoryPage';
 import { useAuth } from '../context/AuthContext';
 
 export default function AppRoutes() {
@@ -22,6 +24,14 @@ export default function AppRoutes() {
             element={isAuthenticated ? <HomePage /> : <LoginPage />}
           />
 
+          {/* Dedicated Category Full Browsing Route */}
+          <Route
+            path="/category/:categoryId"
+            element={
+              isAuthenticated ? <CategoryPage /> : <Navigate to="/" replace />
+            }
+          />
+
           {/* Item Detail Views */}
           <Route
             path="/item/:id"
@@ -33,6 +43,20 @@ export default function AppRoutes() {
             path="/listings/:id"
             element={
               isAuthenticated ? <ListingDetailPage /> : <Navigate to="/" replace />
+            }
+          />
+
+          {/* Dedicated Profile Full Views (Listings, Chats, Saved, History) */}
+          <Route
+            path="/profile"
+            element={
+              isAuthenticated ? <Navigate to="/profile/listings" replace /> : <Navigate to="/" replace />
+            }
+          />
+          <Route
+            path="/profile/:tab"
+            element={
+              isAuthenticated ? <ProfilePage /> : <Navigate to="/" replace />
             }
           />
 
