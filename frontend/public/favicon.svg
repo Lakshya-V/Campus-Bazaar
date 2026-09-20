@@ -1,0 +1,89 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cbCartBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2F6FED" />
+      <stop offset="100%" stop-color="#1B4FC4" />
+    </linearGradient>
+    <linearGradient id="cbWireGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F8CFF" />
+      <stop offset="100%" stop-color="#2F6FED" />
+    </linearGradient>
+    <linearGradient id="cbSpecular" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="white" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="white" stop-opacity="0.2" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded squircle for crisp contrast in both light and dark browser tabs -->
+  <rect width="100" height="100" rx="22" fill="#10131A" />
+
+  <!-- Shopping Cart Wheel 1 -->
+  <circle cx="38" cy="82" r="7" fill="#F2F3F5" />
+  <circle cx="38" cy="82" r="3.5" fill="#2F6FED" />
+
+  <!-- Shopping Cart Wheel 2 -->
+  <circle cx="76" cy="82" r="7" fill="#F2F3F5" />
+  <circle cx="76" cy="82" r="3.5" fill="#2F6FED" />
+
+  <!-- Bottom wheel connecting chassis bar -->
+  <path
+    d="M 28 70 L 80 70"
+    stroke="#2A2D33"
+    stroke-width="4"
+    stroke-linecap="round"
+  />
+
+  <!-- Cart Handle + Back Spine -->
+  <path
+    d="M 12 19 H 24 L 32 65 H 82"
+    stroke="url(#cbWireGrad)"
+    stroke-width="5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Cart Basket Body -->
+  <path
+    d="M 26 27 H 88 L 78 65 H 32 Z"
+    fill="url(#cbCartBg)"
+    stroke="url(#cbWireGrad)"
+    stroke-width="2"
+    stroke-linejoin="round"
+  />
+
+  <!-- Basket Top Specular Rim -->
+  <path
+    d="M 27 28 H 87"
+    stroke="url(#cbSpecular)"
+    stroke-width="2"
+    stroke-linecap="round"
+  />
+
+  <!-- "CB" Monogram embedded directly inside the basket -->
+  <g transform="translate(56, 47)">
+    <text
+      x="-15"
+      y="6"
+      fill="#FFFFFF"
+      font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+      font-weight="900"
+      font-size="23"
+      letter-spacing="-0.5px"
+      text-anchor="middle"
+    >
+      C
+    </text>
+    <text
+      x="5"
+      y="6"
+      fill="#EAF1FF"
+      font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+      font-weight="900"
+      font-size="23"
+      letter-spacing="-0.5px"
+      text-anchor="middle"
+    >
+      B
+    </text>
+  </g>
+</svg>

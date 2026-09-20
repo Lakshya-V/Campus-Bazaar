@@ -1,0 +1,369 @@
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+@theme {
+  --color-surface: rgb(var(--surface));
+  --color-surface-base: rgb(var(--surface-base));
+  --color-surface-panel: rgb(var(--surface-panel));
+  --color-surface-elevated: rgb(var(--surface-elevated));
+  --color-panel: rgb(var(--panel));
+
+  --color-ink: rgb(var(--ink));
+  --color-ink-primary: rgb(var(--ink-primary));
+  --color-ink-secondary: rgb(var(--ink-secondary));
+  --color-ink-muted: rgb(var(--ink-muted));
+  --color-ink-tertiary: rgb(var(--ink-tertiary));
+
+  --color-line: rgb(var(--line));
+  --color-borderline: rgb(var(--borderline));
+
+  --color-brand: rgb(var(--brand));
+  --color-brand-soft: rgb(var(--brand-soft));
+  --color-brand-deep: rgb(var(--brand-deep));
+  --color-brand-tint: rgb(var(--brand-tint));
+
+  --color-accent: rgb(var(--accent));
+  --color-accent-soft: rgb(var(--accent-soft));
+
+  --color-buy: rgb(var(--buy));
+  --color-sell: rgb(var(--sell));
+  --color-sell-ink: rgb(var(--sell-ink));
+  --color-warn: rgb(var(--warn));
+
+  --color-success: #1AA260;
+  --color-danger: #E24C4B;
+  --color-star: #F2A93B;
+
+  --color-ink-navy: #10131A;
+  --color-amber: #F2994A;
+  --color-amber-deep: #D97B2B;
+  --color-blue: #2F6FED;
+  --color-success-green: #1AA260;
+  --color-alert-red: #E24C4B;
+  --color-rating-gold: #F2A93B;
+
+  --shadow-3d-sm: var(--shadow-3d-sm);
+  --shadow-3d-md: var(--shadow-3d-md);
+  --shadow-3d-lg: var(--shadow-3d-lg);
+  --shadow-specular: var(--shadow-specular);
+  --shadow-specular-lg: var(--shadow-specular-lg);
+
+  --font-display: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-text: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring-snap: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ============================================================
+   Campus Bazaar — Color System
+   Brand Accent:
+     Bazaar Blue (primary): #2F6FED
+     Blue Tint (light bg):  #EAF1FF
+     Blue Deep (hover):     #1B4FC4
+     Dark Glow:             #4F8CFF
+
+   Light Mode:
+     Surface:        #FFFFFF
+     Background:     #F5F6F8
+     Border:         #E7E9EC
+     Text Secondary: #6B7280
+     Text Primary:   #111318
+
+   Dark Mode:
+     Surface:        #16181C
+     Background:     #0D0F12
+     Border:         #2A2D33
+     Text Secondary: #9AA1AC
+     Text Primary:   #F2F3F5
+
+   Semantic Condition:
+     New:  #12A150
+     Good: #2F6FED
+     Fair: #E0912B
+
+   Semantic Status:
+     Success: #12A150
+     Sold:    #D64545
+     Star:    #FFC542
+     Muted:   #6B7280
+   ============================================================ */
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --surface: 255 255 255;           /* #FFFFFF */
+  --surface-base: 245 246 248;      /* #F5F6F8 */
+  --panel: 255 255 255;             /* #FFFFFF */
+  --surface-panel: 255 255 255;
+  --surface-elevated: 255 255 255;
+
+  /* Border */
+  --line: 231 233 236;              /* #E7E9EC */
+  --borderline: 231 233 236;
+
+  /* Text / Ink */
+  --ink: 17 19 24;                  /* #111318 Text Primary */
+  --ink-primary: 17 19 24;          /* #111318 */
+  --ink-secondary: 107 114 128;     /* #6B7280 Text Secondary */
+  --ink-muted: 107 114 128;         /* #6B7280 */
+  --ink-tertiary: 156 163 175;
+
+  /* Brand — Bazaar Blue */
+  --brand: 47 111 237;              /* #2F6FED Bazaar Blue primary */
+  --brand-soft: 79 140 255;         /* #4F8CFF */
+  --brand-deep: 27 79 196;          /* #1B4FC4 Blue Deep hover/active */
+  --brand-tint: 234 241 255;        /* #EAF1FF Blue Tint light bg */
+
+  --accent: 47 111 237;             /* #2F6FED */
+  --accent-soft: 79 140 255;
+
+  /* Buy / Sell / Warn */
+  --buy: 47 111 237;                /* #2F6FED */
+  --sell: 47 111 237;               /* #2F6FED */
+  --sell-ink: 255 255 255;
+  --warn: 224 145 43;               /* #E0912B Fair */
+
+  /* Frosted glass fill */
+  --glass-fill: 255 255 255;
+  --glass-fill-alpha: 0.85;
+  --glass-border-alpha: 0.12;
+
+  /* Specular top-edge highlight */
+  --specular-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+
+  /* 3D elevation stack with Bazaar Blue hover glow @ 18% */
+  --shadow-3d-sm:
+    0 1px 2px rgba(17, 19, 24, 0.04),
+    0 2px 6px rgba(17, 19, 24, 0.05),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+  --shadow-3d-md:
+    0 4px 12px rgba(17, 19, 24, 0.06),
+    0 12px 24px rgba(17, 19, 24, 0.07),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+  --shadow-3d-lg:
+    0 10px 24px rgba(17, 19, 24, 0.07),
+    0 24px 48px rgba(17, 19, 24, 0.10),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+  --shadow-specular:
+    0 12px 36px rgba(47, 111, 237, 0.18),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+  --shadow-specular-lg:
+    0 20px 50px rgba(47, 111, 237, 0.18),
+    0 4px 16px rgba(47, 111, 237, 0.10),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+
+  /* 5-Color System Variables */
+  --ink-navy: 16 19 26;             /* #10131A Navbar, footer, dark-mode bg */
+  --amber: 242 153 74;              /* #F2994A All primary CTA buttons */
+  --amber-deep: 217 123 43;         /* #D97B2B Amber hover/active */
+  --blue: 47 111 237;               /* #2F6FED Links, verified, active cat, chat sent */
+  --success-green: 26 162 96;       /* #1AA260 New condition, deal-closed */
+  --alert-red: 226 76 75;           /* #E24C4B Sold badge, error states */
+  --rating-gold: 242 169 59;        /* #F2A93B Star ratings only */
+
+  /* Ambient background */
+  --ambient-bg:
+    radial-gradient(circle at 10% -5%, rgba(47, 111, 237, 0.07), transparent 38%),
+    radial-gradient(circle at 90% 15%, rgba(234, 241, 255, 0.9), transparent 45%),
+    radial-gradient(circle at 50% 100%, rgba(234, 241, 255, 0.6), transparent 50%);
+}
+
+.dark {
+  color-scheme: dark;
+
+  /* Surfaces — Ink Navy background */
+  --surface: 22 26 36;              /* #161A24 Elevated surface on ink navy */
+  --surface-base: 16 19 26;         /* #10131A Ink Navy page background */
+  --panel: 22 26 36;
+  --surface-panel: 22 26 36;
+  --surface-elevated: 30 35 48;
+
+  /* Border */
+  --line: 42 45 51;                 /* #2A2D33 */
+  --borderline: 42 45 51;
+
+  /* Text / Ink */
+  --ink: 242 243 245;               /* #F2F3F5 Text Primary */
+  --ink-primary: 242 243 245;       /* #F2F3F5 */
+  --ink-secondary: 154 161 172;     /* #9AA1AC Text Secondary */
+  --ink-muted: 154 161 172;         /* #9AA1AC */
+  --ink-tertiary: 107 114 128;
+
+  /* Brand — Bazaar Blue with #4F8CFF glow in dark */
+  --brand: 47 111 237;              /* #2F6FED */
+  --brand-soft: 79 140 255;         /* #4F8CFF Dark glow */
+  --brand-deep: 27 79 196;          /* #1B4FC4 */
+  --brand-tint: 26 38 64;           /* Deep blue tint */
+
+  --accent: 79 140 255;             /* #4F8CFF */
+  --accent-soft: 120 170 255;
+
+  --buy: 47 111 237;                /* #2F6FED */
+  --sell: 79 140 255;               /* #4F8CFF */
+  --sell-ink: 13 15 18;
+  --warn: 224 145 43;               /* #E0912B Fair */
+
+  /* Frosted glass fill */
+  --glass-fill: 22 24 28;
+  --glass-fill-alpha: 0.75;
+  --glass-border-alpha: 0.15;
+
+  --specular-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+
+  /* 3D elevation stack with Dark mode glow: #4F8CFF @ 35% */
+  --shadow-3d-sm:
+    0 1px 2px rgba(0, 0, 0, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+  --shadow-3d-md:
+    0 6px 16px rgba(0, 0, 0, 0.65),
+    0 16px 32px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+  --shadow-3d-lg:
+    0 14px 32px rgba(0, 0, 0, 0.75),
+    0 32px 64px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+  --shadow-specular:
+    0 12px 40px rgba(79, 140, 255, 0.35),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+  --shadow-specular-lg:
+    0 25px 60px rgba(79, 140, 255, 0.35),
+    0 6px 20px rgba(79, 140, 255, 0.20),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+
+  /* Ambient background */
+  --ambient-bg:
+    radial-gradient(circle at 15% -10%, rgba(47, 111, 237, 0.14), transparent 45%),
+    radial-gradient(circle at 85% 15%, rgba(79, 140, 255, 0.10), transparent 42%),
+    radial-gradient(circle at 50% 100%, rgba(27, 79, 196, 0.18), transparent 55%);
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background-color: rgb(var(--surface-base));
+  color: rgb(var(--ink));
+  background-image: var(--ambient-bg);
+  background-attachment: fixed;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  transition:
+    background-color 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ============================================================
+   Apple-style frosted glass
+   ============================================================ */
+
+.apple-glass {
+  background-color: rgba(var(--glass-fill), var(--glass-fill-alpha));
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(var(--borderline), 1);
+}
+
+.apple-glass-thin {
+  background-color: rgba(
+    var(--glass-fill),
+    calc(var(--glass-fill-alpha) - 0.2)
+  );
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(var(--borderline), 1);
+}
+
+/* ============================================================
+   Hardware-like inset beveled border (laser-cut sub-pixel edge)
+   ============================================================ */
+
+.specular-border {
+  position: relative;
+  border: 1px solid rgba(var(--borderline), 1);
+  box-shadow: var(--specular-highlight);
+}
+
+.specular-border::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.25),
+    rgba(255, 255, 255, 0) 40%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.4;
+}
+
+/* ============================================================
+   Micro-interactions
+   ============================================================ */
+
+.tap-target {
+  touch-action: manipulation;
+}
+
+.focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  box-shadow: 0 0 0 3px rgba(var(--brand), 0.35);
+}
+
+.press-feedback {
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.press-feedback:active {
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================
+   Scrollbars
+   ============================================================ */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--ink-muted), 0.35);
+  border-radius: 999px;
+  border: 2px solid rgb(var(--surface));
+}
