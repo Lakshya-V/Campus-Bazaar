@@ -68,10 +68,10 @@ export default function ListingCard({ item }: ListingCardProps) {
         onClick={handleCardClick}
         className="block h-full outline-none focus-visible:ring-2 focus-visible:ring-[#2F6FED] rounded-2xl cursor-pointer"
       >
-        <Apple3DCard className="h-full rounded-2xl">
+        <Apple3DCard className="h-full rounded-3xl">
           {/* Layer 1: Background & image layer — translateZ(0) */}
           <div
-            className="relative aspect-[4/3] overflow-hidden rounded-t-2xl bg-surface-elevated"
+            className="relative aspect-[4/3] overflow-hidden rounded-t-3xl bg-zinc-100 dark:bg-zinc-800"
             style={{ transform: 'translateZ(0px)', transformStyle: 'preserve-3d' }}
           >
             {coverImage ? (
@@ -79,7 +79,7 @@ export default function ListingCard({ item }: ListingCardProps) {
                 src={coverImage}
                 alt={item.Title}
                 loading="lazy"
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-sm text-ink-muted">

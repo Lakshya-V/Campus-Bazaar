@@ -57,7 +57,7 @@ export function Apple3DCard({
 
   // Specular glare: soft radial glow (0.15 - 0.22 opacity) centered on pointer relative to card
   const glareBackground = useMotionTemplate`radial-gradient(circle 320px at ${glareSpringX}% ${glareSpringY}%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.05) 45%, transparent 80%)`;
-  const accentAura = useMotionTemplate`radial-gradient(circle 360px at ${glareSpringX}% ${glareSpringY}%, rgba(var(--brand), 0.15), transparent 70%)`;
+  const accentAura = useMotionTemplate`radial-gradient(circle 360px at ${glareSpringX}% ${glareSpringY}%, rgba(161, 161, 170, 0.12), transparent 70%)`;
 
   // Glare opacity fades in on hover, fades out cleanly through spring on leave
   const glareOpacity = useTransform(hoverSpring, [0, 1], [0, 1]);
@@ -69,7 +69,7 @@ export function Apple3DCard({
     [0, 1],
     [
       '0 4px 10px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03)',
-      '0 25px 50px -12px rgba(var(--brand), 0.18), 0 0 45px -8px rgba(var(--brand-soft), 0.35)'
+      '0 25px 50px -12px rgba(0, 0, 0, 0.12), 0 0 45px -8px rgba(161, 161, 170, 0.18)'
     ]
   );
 

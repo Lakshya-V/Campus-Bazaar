@@ -1,6 +1,15 @@
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import Category, Conversation, CustomUser, Favorite, Listing, Message
 from .utils import upload_listing_image
+
+class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        username = attrs.get(self.username_field)
+        user = CustomUser.objects.filter(university_email__iexact=username).first()
+        if user:
+            attrs[self.username_field] = user.username
+        return super().validate(attrs)
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)

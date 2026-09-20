@@ -34,12 +34,20 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { items, categories } = useMarket();
+  const { items, categories, fetchListings } = useMarket();
   const [searchParams, setSearchParams] = useSearchParams();
+  const conditionFilter = searchParams.get('condition') || '';
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, []);
+
+  useEffect(() => {
+    void fetchListings({
+      search: searchParams.get('q') || undefined,
+      condition: conditionFilter || undefined,
+    });
+  }, [conditionFilter, fetchListings, searchParams]);
 
   const searchQuery = searchParams.get('q') || '';
   const [sortBy, setSortBy] = useState<SortOption>('newest');
@@ -50,6 +58,7 @@ export default function HomePage() {
   const filteredItems = useMemo(() => {
     return items
       .filter((item) => item.Status === 'AVAILABLE')
+      .filter((item) => !conditionFilter || item.Condition === conditionFilter)
       .filter((item) => {
         if (!searchQuery.trim()) return true;
         const q = searchQuery.toLowerCase();
@@ -71,7 +80,7 @@ export default function HomePage() {
         if (sortBy === 'views') return b.ViewCount - a.ViewCount;
         return new Date(b.PostedAt).getTime() - new Date(a.PostedAt).getTime();
       });
-  }, [items, searchQuery, maxBudget, sortBy]);
+  }, [items, searchQuery, conditionFilter, maxBudget, sortBy]);
 
   // Group filtered items by category, capped at 4 items per category row
   const categorySections = useMemo(() => {
@@ -138,14 +147,32 @@ export default function HomePage() {
       {/* ═══════════════════════════════════════════════════════════════
           1. HERO HEADING — CENTER-ALIGNED
           ═══════════════════════════════════════════════════════════════ */}
-      <div className="flex flex-col items-center justify-center text-center py-3">
-        <div className="inline-flex items-center rounded-full px-3.5 py-1 text-[10px] font-semibold uppercase tracking-wider bg-[#111318] text-[#FFFFFF] dark:bg-[#F2F3F5] dark:text-[#0D0F12] border border-borderline mb-3 shadow-xs">
-          Campus Marketplace · Verified Students
+      <div className="relative flex flex-col items-center justify-center py-8 text-center sm:py-12">
+        <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-between px-2 text-left sm:px-10">
+          <motion.div
+            animate={{ y: [0, -5, 0] }}
+            transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+            className="hidden items-center gap-2 rounded-full border border-black/5 bg-white/65 px-3 py-2 text-[10px] font-medium text-zinc-500 shadow-[0_12px_30px_rgba(0,0,0,0.06)] backdrop-blur-2xl dark:border-white/10 dark:bg-zinc-900/65 dark:text-zinc-400 sm:flex"
+          >
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-500" />
+            Live campus feed
+          </motion.div>
+          <motion.div
+            animate={{ y: [0, 5, 0] }}
+            transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
+            className="hidden items-center gap-2 rounded-full border border-black/5 bg-white/65 px-3 py-2 text-[10px] font-medium text-zinc-500 shadow-[0_12px_30px_rgba(0,0,0,0.06)] backdrop-blur-2xl dark:border-white/10 dark:bg-zinc-900/65 dark:text-zinc-400 sm:flex"
+          >
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-400" />
+            Verified students only
+          </motion.div>
         </div>
-        <h1 className="font-display text-4xl font-bold tracking-tight text-ink sm:text-6xl text-center leading-tight">
+        <div className="mb-4 inline-flex items-center rounded-full border border-black/5 bg-white/70 px-3.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-zinc-900/70 dark:text-zinc-400">
+          Campus marketplace
+        </div>
+        <h1 className="font-display text-4xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-6xl leading-tight">
           Browse the bazaar
         </h1>
-        <p className="mt-3 text-sm sm:text-base text-ink-muted max-w-xl font-body text-center mx-auto leading-relaxed">
+        <p className="mt-4 max-w-xl text-sm leading-relaxed text-zinc-500 dark:text-zinc-400 sm:text-base">
           Textbooks, dorm furniture, and tech essentials direct from verified students across campus.
         </p>
       </div>
@@ -162,7 +189,7 @@ export default function HomePage() {
           ═══════════════════════════════════════════════════════════════ */}
       <div className="space-y-4">
         {/* Category Navigation Pills */}
-        <div className="no-scrollbar flex items-center gap-2 overflow-x-auto pb-1">
+        <div className="no-scrollbar flex items-center gap-2 overflow-x-auto rounded-3xl border border-black/5 bg-white/60 p-1.5 shadow-[0_12px_30px_rgba(0,0,0,0.05)] backdrop-blur-2xl dark:border-white/10 dark:bg-zinc-900/60 pb-1">
           {categories.map((cat) => {
             const isAll = cat.Name === 'All Categories';
             return (
@@ -170,25 +197,48 @@ export default function HomePage() {
                 key={cat.Category_ID}
                 type="button"
                 onClick={() => handleCategoryPillClick(cat.Name)}
-                className={`flex-shrink-0 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
+                className={`relative flex-shrink-0 rounded-2xl px-4 py-2 text-xs font-semibold tracking-tight transition-transform cursor-pointer ${
                   isAll
-                    ? 'bg-[#2F6FED] text-white shadow-sm'
-                    : 'border border-borderline bg-surface text-ink hover:bg-surface-elevated'
+                    ? 'text-white dark:text-zinc-950'
+                    : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
                 }`}
               >
-                {cat.Name}
+                {isAll && (
+                  <motion.span
+                    layoutId="active-category"
+                    transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+                    className="absolute inset-0 -z-0 rounded-2xl bg-zinc-900 shadow-sm dark:bg-zinc-100"
+                  />
+                )}
+                <span className="relative z-10">{cat.Name}</span>
               </button>
             );
           })}
         </div>
 
         {/* Filter Controls Bar: Interactive Budget Slider & Sort Controls */}
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-borderline bg-surface/90 p-3 sm:px-5 sm:py-3 shadow-sm backdrop-blur-xl">
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-black/5 bg-white/65 p-3 shadow-[0_20px_50px_rgba(0,0,0,0.06)] backdrop-blur-2xl dark:border-white/10 dark:bg-zinc-900/65 sm:px-5 sm:py-3">
           {/* Draggable Budget Range Slider */}
           <BudgetRangeSlider
             value={maxBudget}
             onChange={(val) => setMaxBudget(val)}
           />
+          <select
+            value={conditionFilter}
+            onChange={(event) => {
+              const next = new URLSearchParams(searchParams);
+              if (event.target.value) next.set('condition', event.target.value);
+              else next.delete('condition');
+              setSearchParams(next, { replace: true });
+            }}
+            className="rounded-full border border-borderline bg-surface-base px-3 py-2 text-xs text-ink outline-none"
+            aria-label="Filter by condition"
+          >
+            <option value="">All conditions</option>
+            <option value="new">New</option>
+            <option value="good">Good</option>
+            <option value="fair">Fair</option>
+          </select>
 
           {/* Right: Sticky Sort Segmented Control */}
           <div className="flex items-center gap-1.5 text-xs">
@@ -196,7 +246,7 @@ export default function HomePage() {
               <ArrowUpDown className="h-3 w-3" />
               Sort:
             </span>
-            <div className="flex items-center gap-1 rounded-full border border-borderline bg-surface-base p-1">
+            <div className="flex items-center gap-1 rounded-2xl bg-zinc-100/80 p-1 dark:bg-zinc-800/80">
               {[
                 { id: 'newest', label: 'Newest' },
                 { id: 'price_asc', label: 'Price: Low-High' },
@@ -207,13 +257,20 @@ export default function HomePage() {
                   key={s.id}
                   type="button"
                   onClick={() => setSortBy(s.id as SortOption)}
-                  className={`rounded-full px-3 py-1 text-[11px] font-medium transition-all cursor-pointer ${
+                  className={`relative rounded-xl px-3 py-1 text-[11px] font-medium transition-transform cursor-pointer ${
                     sortBy === s.id
-                      ? 'bg-[#111318] text-[#FFFFFF] dark:bg-[#F2F3F5] dark:text-[#0D0F12] font-semibold shadow-xs'
-                      : 'text-ink-muted hover:text-ink'
+                      ? 'text-white dark:text-zinc-950 font-semibold'
+                      : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
                   }`}
                 >
-                  {s.label}
+                  {sortBy === s.id && (
+                    <motion.span
+                      layoutId="active-sort"
+                      transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+                      className="absolute inset-0 -z-0 rounded-xl bg-zinc-900 dark:bg-zinc-100"
+                    />
+                  )}
+                  <span className="relative z-10">{s.label}</span>
                 </button>
               ))}
             </div>

@@ -50,6 +50,7 @@ export default function CreateListingPage() {
   const [condition, setCondition] = useState<ListingCondition>('good');
   const [description, setDescription] = useState('');
   const [images, setImages] = useState<string[]>([PRESET_IMAGES[0].url]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [customUrl, setCustomUrl] = useState('');
 
   const [isPublishing, setIsPublishing] = useState(false);
@@ -83,6 +84,7 @@ export default function CreateListingPage() {
       const file = e.target.files[i];
       if (file.type.startsWith('image/')) {
         newUrls.push(URL.createObjectURL(file));
+        setImageFiles((prev) => [...prev, file]);
       }
     }
     if (newUrls.length > 0) {
@@ -100,7 +102,7 @@ export default function CreateListingPage() {
     setCustomCategoryName('');
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!title.trim() || !price || !description.trim() || images.length === 0) return;
 
@@ -115,20 +117,21 @@ export default function CreateListingPage() {
 
     setIsPublishing(true);
 
-    // Simulate snappy creation morph
-    setTimeout(() => {
-      const newItem = addItem({
+    try {
+      const newItem = await addItem({
         Title: title.trim(),
         Category: finalCategory,
         Price: Math.max(1, parseFloat(price) || 10),
         Condition: condition,
         Description: description.trim(),
         Images: images.length > 0 ? images : [PRESET_IMAGES[0].url],
+        imageFile: imageFiles[0],
       });
 
       setCreatedItem(newItem);
+    } finally {
       setIsPublishing(false);
-    }, 600);
+    }
   }
 
   return (

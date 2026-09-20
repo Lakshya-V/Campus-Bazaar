@@ -8,7 +8,7 @@ export default function Layout() {
   const { isAuthenticated } = useAuth();
 
   return (
-    <div className="relative min-h-screen font-body text-ink selection:bg-[#2F6FED] selection:text-white">
+    <div className="relative min-h-screen font-body text-ink selection:bg-zinc-900 selection:text-white dark:selection:bg-zinc-100 dark:selection:text-zinc-950">
       {/* Fixed, full-viewport ambient spatial canvas */}
       <MotionCanvas />
 

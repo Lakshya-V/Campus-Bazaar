@@ -3,6 +3,7 @@ from django.db.models import Q
 
 # Create your views here.
 from rest_framework import generics, permissions
+from rest_framework_simplejwt.views import TokenObtainPairView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
@@ -16,7 +17,11 @@ from .serializers import (
     MessageSerializer,
     UserRegistrationSerializer,
     UserProfileSerializer,
+    EmailTokenObtainPairSerializer,
 )
+
+class EmailTokenObtainPairView(TokenObtainPairView):
+    serializer_class = EmailTokenObtainPairSerializer
 
 class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()

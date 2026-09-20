@@ -38,10 +38,10 @@ export default function Navbar() {
   return (
     <>
       <header
-        className={`sticky top-0 z-50 transition-all duration-300 ${
+        className={`sticky top-0 z-50 border-b border-black/5 bg-white/70 backdrop-blur-2xl dark:border-white/10 dark:bg-zinc-900/70 ${
           isScrolled
-            ? 'bg-surface/95 dark:bg-[#10131A]/95 backdrop-blur-xl border-b border-borderline shadow-md'
-            : 'bg-surface/75 dark:bg-[#10131A]/75 backdrop-blur-md border-b border-transparent'
+            ? 'shadow-[0_12px_32px_rgba(0,0,0,0.06)]'
+            : 'shadow-none'
         }`}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
@@ -75,7 +75,7 @@ export default function Navbar() {
             {/* Post an Item CTA — AMBER #F2994A per Mandatory Palette */}
             <Link
               to="/sell/new"
-              className="flex items-center gap-1.5 rounded-xl bg-[#F2994A] px-3.5 py-2 text-xs sm:text-sm font-semibold text-[#10131A] shadow-sm transition-all hover:bg-[#D97B2B] active:scale-95"
+              className="flex items-center gap-1.5 rounded-2xl bg-zinc-900 px-3.5 py-2 text-xs font-semibold text-white shadow-[0_8px_20px_rgba(0,0,0,0.12)] transition-transform active:scale-95 dark:bg-zinc-100 dark:text-zinc-950"
             >
               <Plus className="h-4 w-4" strokeWidth={2.5} />
               <span className="hidden sm:inline">Post an Item</span>
@@ -91,10 +91,10 @@ export default function Navbar() {
               onClick={toggleTheme}
               aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-borderline bg-surface/60 text-ink transition-colors hover:border-[#2F6FED]/40 hover:bg-surface cursor-pointer"
+              className="relative flex h-9 w-9 items-center justify-center rounded-2xl border border-black/5 bg-white/60 text-ink transition-transform hover:scale-[1.04] dark:border-white/10 dark:bg-zinc-800/60 cursor-pointer"
             >
               {isDark ? (
-                <Sun className="h-4 w-4 text-[#F2A93B]" />
+                <Sun className="h-4 w-4 text-zinc-300" />
               ) : (
                 <Moon className="h-4 w-4 text-ink-muted hover:text-ink transition-colors" />
               )}
@@ -105,12 +105,12 @@ export default function Navbar() {
               type="button"
               onClick={() => setAccountMenuOpen(true)}
               aria-label="Account & Settings menu"
-              className="flex items-center gap-1.5 rounded-xl border border-borderline bg-surface/60 p-1 pr-1.5 text-ink transition-all hover:border-[#2F6FED]/40 hover:bg-surface"
+              className="flex items-center gap-1.5 rounded-2xl border border-black/5 bg-white/60 p-1 pr-1.5 text-ink transition-transform hover:scale-[1.03] dark:border-white/10 dark:bg-zinc-800/60"
             >
               <img
                 src={user?.AvatarSeed}
                 alt={user?.Name || 'User'}
-                className="h-7 w-7 rounded-lg object-cover ring-1 ring-[#2F6FED]/30"
+                className="h-7 w-7 rounded-xl object-cover ring-1 ring-black/10 dark:ring-white/15"
               />
               <MoreVertical className="h-3.5 w-3.5 text-ink-muted" />
             </button>

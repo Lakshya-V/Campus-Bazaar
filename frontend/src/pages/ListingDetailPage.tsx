@@ -99,14 +99,18 @@ export default function ListingDetailPage() {
     .filter((i) => i.Category === currentItem.Category && i.Item_ID !== currentItem.Item_ID && i.Status === 'AVAILABLE')
     .slice(0, 4);
 
-  function handleStartChat() {
+  async function handleStartChat() {
     setIsStartingChat(true);
-    const session = startChatSession(currentItem.Item_ID, currentItem.Seller_ID);
-    triggerCartSwipe(`/chat/${session.Session_ID}`, {
-      message: 'Connecting to student chat...',
-      duration: 750,
-      onComplete: () => setIsStartingChat(false),
-    });
+    try {
+      const session = await startChatSession(currentItem.Item_ID, currentItem.Seller_ID);
+      triggerCartSwipe(`/chat/${session.Session_ID}`, {
+        message: 'Connecting to student chat...',
+        duration: 750,
+        onComplete: () => setIsStartingChat(false),
+      });
+    } catch {
+      setIsStartingChat(false);
+    }
   }
 
   function handleConfirmMarkSold() {

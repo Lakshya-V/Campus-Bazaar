@@ -196,7 +196,7 @@ export default function ChatPage() {
       </AnimatePresence>
 
       {/* Main Chat Container */}
-      <div className="flex flex-col h-[75vh] overflow-hidden rounded-2xl border border-borderline bg-surface shadow-xs">
+      <div className="flex h-[75vh] flex-col overflow-hidden rounded-3xl border border-black/5 bg-white/70 shadow-[0_20px_50px_rgba(0,0,0,0.08)] backdrop-blur-2xl dark:border-white/10 dark:bg-zinc-900/70">
         {/* Pinned Item Summary Card at Top (Compact Version of Detail Card) */}
         <div className="border-b border-borderline bg-surface-base/60 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">

@@ -1,18 +1,13 @@
-// src/context/MarketContext.tsx
-//
-// In-memory reactive state context & hooks for Campus Bazaar.
-// Backed by localStorage so items, status changes, chats, wishlist,
-// and ratings persist across navigations without requiring any real backend.
-
 import {
   createContext,
-  useContext,
-  useState,
-  useEffect,
   useCallback,
+  useContext,
+  useEffect,
   useMemo,
+  useState,
   type ReactNode,
 } from 'react';
+import { axiosInstance } from '../api/axios';
 import type {
   User,
   Item,
@@ -23,16 +18,53 @@ import type {
   Rating,
   ListingCondition,
 } from '../types/market';
-import {
-  INITIAL_USERS,
-  INITIAL_ITEMS,
-  INITIAL_CHAT_SESSIONS,
-  INITIAL_MESSAGES,
-  INITIAL_WISHLIST,
-  INITIAL_RATINGS,
-  INITIAL_CATEGORIES,
-} from '../data/mockMarketData';
 import { useAuth } from './AuthContext';
+
+interface ApiCategory {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+interface ApiListing {
+  id: number;
+  seller: number;
+  category: number | null;
+  title: string;
+  description: string;
+  price: string | number;
+  condition: string;
+  status: string;
+  image_url: string;
+  created_at: string;
+}
+
+interface ApiConversation {
+  id: number;
+  listing: number;
+  buyer: number;
+  seller: number;
+  created_at: string;
+}
+
+interface ApiMessage {
+  id: number;
+  conversation: number;
+  sender: number;
+  text: string;
+  timestamp: string;
+}
+
+interface ApiFavorite {
+  id: number;
+  listing: ApiListing;
+}
+
+interface ListingFilters {
+  search?: string;
+  category?: string;
+  condition?: string;
+}
 
 export interface NewItemInput {
   Title: string;
@@ -41,6 +73,7 @@ export interface NewItemInput {
   Condition: ListingCondition;
   Description: string;
   Images: string[];
+  imageFile?: File;
 }
 
 export interface NotificationItem {
@@ -58,537 +91,336 @@ interface MarketContextValue {
   users: User[];
   getUser: (userId: string) => User | undefined;
   items: Item[];
+  fetchListings: (filters?: ListingFilters) => Promise<void>;
   getItem: (itemId: string) => Item | undefined;
-  addItem: (input: NewItemInput) => Item;
+  addItem: (input: NewItemInput) => Promise<Item>;
   markItemSold: (itemId: string, winningBuyerId?: string) => void;
   incrementItemView: (itemId: string) => void;
-
   categories: Category[];
   addCategory: (name: string) => Category;
-
-  // Wishlist
   wishlist: WishlistItem[];
-  toggleWishlist: (itemId: string) => void;
+  toggleWishlist: (itemId: string) => Promise<void>;
   isWishlisted: (itemId: string) => boolean;
-
-  // Recently viewed
   recentlyViewedIds: string[];
   recordViewedItem: (itemId: string) => void;
-
-  // Chats & Messages
   chatSessions: ChatSession[];
   messages: Message[];
   getSessionsForUser: (userId: string) => ChatSession[];
   getSessionById: (sessionId: string) => ChatSession | undefined;
   getMessagesForSession: (sessionId: string) => Message[];
-  startChatSession: (itemId: string, sellerId: string) => ChatSession;
+  startChatSession: (itemId: string, sellerId: string) => Promise<ChatSession>;
   sendMessage: (
     sessionId: string,
     text: string,
     media?: { type: 'image' | 'video'; url: string }
-  ) => Message;
-
-  // Ratings
+  ) => Promise<Message>;
   ratings: Rating[];
   addRating: (sessionId: string, ratedUserId: string, score: number, comment: string) => void;
   hasRated: (sessionId: string, raterUserId: string) => boolean;
   getRatingsForUser: (userId: string) => Rating[];
-
-  // Notifications
   notifications: NotificationItem[];
   unreadNotificationCount: number;
 }
 
 const MarketContext = createContext<MarketContextValue | undefined>(undefined);
 
-const STORAGE_KEYS = {
-  ITEMS: 'campus_bazaar_items_v2',
-  USERS: 'campus_bazaar_users_v2',
-  SESSIONS: 'campus_bazaar_sessions_v2',
-  MESSAGES: 'campus_bazaar_messages_v2',
-  WISHLIST: 'campus_bazaar_wishlist_v2',
-  RATINGS: 'campus_bazaar_ratings_v2',
-  RECENT: 'campus_bazaar_recent_v2',
-  CATEGORIES: 'campus_bazaar_categories_v2',
-};
+function listData<T>(data: T[] | { results: T[] }): T[] {
+  return Array.isArray(data) ? data : data.results;
+}
 
-function loadFromStorage<T>(key: string, fallback: T): T {
-  try {
-    const saved = localStorage.getItem(key);
-    if (saved) {
-      return JSON.parse(saved);
-    }
-  } catch {
-    // Ignore parse errors, use fallback
-  }
-  return fallback;
+function normalizeCondition(value: string): ListingCondition {
+  const condition = value.toLowerCase();
+  if (condition.includes('new') && !condition.includes('like')) return 'new';
+  if (condition.includes('fair')) return 'fair';
+  return 'good';
 }
 
 export function MarketProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const currentUserId = user?.User_ID || 'user_alex';
-
-  const [categories, setCategories] = useState<Category[]>(() =>
-    loadFromStorage(STORAGE_KEYS.CATEGORIES, INITIAL_CATEGORIES)
-  );
-
-  const [users, setUsers] = useState<User[]>(() =>
-    loadFromStorage(STORAGE_KEYS.USERS, INITIAL_USERS)
-  );
-
-  const [items, setItems] = useState<Item[]>(() =>
-    loadFromStorage(STORAGE_KEYS.ITEMS, INITIAL_ITEMS)
-  );
-
-  const [chatSessions, setChatSessions] = useState<ChatSession[]>(() =>
-    loadFromStorage(STORAGE_KEYS.SESSIONS, INITIAL_CHAT_SESSIONS)
-  );
-
-  const [messages, setMessages] = useState<Message[]>(() =>
-    loadFromStorage(STORAGE_KEYS.MESSAGES, INITIAL_MESSAGES)
-  );
-
-  const [wishlist, setWishlist] = useState<WishlistItem[]>(() =>
-    loadFromStorage(STORAGE_KEYS.WISHLIST, INITIAL_WISHLIST)
-  );
-
-  const [ratings, setRatings] = useState<Rating[]>(() =>
-    loadFromStorage(STORAGE_KEYS.RATINGS, INITIAL_RATINGS)
-  );
-
-  const [recentlyViewedIds, setRecentlyViewedIds] = useState<string[]>(() =>
-    loadFromStorage(STORAGE_KEYS.RECENT, ['item_102', 'item_101'])
-  );
-
-  // Sync state to localStorage on changes
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(items));
-  }, [items]);
+  const currentUserId = user?.User_ID || '';
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [users, setUsers] = useState<User[]>(user ? [user] : []);
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
+  const [recentlyViewedIds, setRecentlyViewedIds] = useState<string[]>([]);
+  const [ratings, setRatings] = useState<Rating[]>([]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-  }, [users]);
+    setUsers(user ? [user] : []);
+  }, [user]);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(chatSessions));
-  }, [chatSessions]);
+  const categoryById = useMemo(
+    () => new Map(categories.map((category) => [Number(category.Category_ID), category.Name])),
+    [categories]
+  );
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages));
-  }, [messages]);
+  const toItem = useCallback(
+    (listing: ApiListing): Item => ({
+      Item_ID: String(listing.id),
+      Seller_ID: String(listing.seller),
+      Title: listing.title,
+      Category: categoryById.get(Number(listing.category)) || 'Uncategorized',
+      Price: Number(listing.price),
+      Condition: normalizeCondition(listing.condition),
+      Status: listing.status === 'SOLD' ? 'SOLD' : 'AVAILABLE',
+      Images: listing.image_url ? [listing.image_url] : [],
+      Description: listing.description,
+      PostedAt: listing.created_at,
+      ViewCount: 0,
+    }),
+    [categoryById]
+  );
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.WISHLIST, JSON.stringify(wishlist));
-  }, [wishlist]);
+  const loadMarket = useCallback(async () => {
+    const [categoryResponse, listingResponse, conversationResponse, messageResponse, favoriteResponse] =
+      await Promise.all([
+        axiosInstance.get<ApiCategory[] | { results: ApiCategory[] }>('/categories/'),
+        axiosInstance.get<ApiListing[] | { results: ApiListing[] }>('/listings/'),
+        currentUserId
+          ? axiosInstance.get<ApiConversation[] | { results: ApiConversation[] }>('/conversations/')
+          : Promise.resolve({ data: [] as ApiConversation[] }),
+        currentUserId
+          ? axiosInstance.get<ApiMessage[] | { results: ApiMessage[] }>('/messages/')
+          : Promise.resolve({ data: [] as ApiMessage[] }),
+        currentUserId
+          ? axiosInstance.get<ApiFavorite[]>('/favorites/')
+          : Promise.resolve({ data: [] as ApiFavorite[] }),
+      ]);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.RATINGS, JSON.stringify(ratings));
-  }, [ratings]);
+    const apiCategories = listData(categoryResponse.data);
+    const nextCategories = [
+      { Category_ID: 'cat_all', Name: 'All Categories' },
+      ...apiCategories.map((category) => ({
+        Category_ID: String(category.id),
+        Name: category.name,
+      })),
+    ];
+    setCategories(nextCategories);
+    const namesById = new Map(nextCategories.map((category) => [Number(category.Category_ID), category.Name]));
+    setItems(listData(listingResponse.data).map((listing) => ({
+      ...toItem(listing),
+      Category: namesById.get(Number(listing.category)) || 'Uncategorized',
+    })));
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.RECENT, JSON.stringify(recentlyViewedIds));
-  }, [recentlyViewedIds]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories));
-  }, [categories]);
-
-  const addCategory = useCallback((name: string): Category => {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      return INITIAL_CATEGORIES[0];
-    }
-    const existing = categories.find(
-      (c) => c.Name.toLowerCase() === trimmed.toLowerCase()
+    const apiConversations = listData(conversationResponse.data);
+    setChatSessions(
+      apiConversations.map((conversation) => ({
+        Session_ID: String(conversation.id),
+        Item_ID: String(conversation.listing),
+        Buyer_ID: String(conversation.buyer),
+        Seller_ID: String(conversation.seller),
+        CreatedAt: conversation.created_at,
+      }))
     );
-    if (existing) {
-      return existing;
+    const apiMessages = listData(messageResponse.data);
+    setMessages(
+      apiMessages.map((message) => ({
+        Message_ID: String(message.id),
+        Session_ID: String(message.conversation),
+        Sender_ID: String(message.sender),
+        Text: message.text,
+        Timestamp: message.timestamp,
+      }))
+    );
+    setWishlist(
+      favoriteResponse.data.map((favorite) => ({
+        User_ID: currentUserId,
+        Item_ID: String(favorite.listing.id),
+        SavedAt: '',
+      }))
+    );
+  }, [currentUserId, toItem]);
+
+  const fetchListings = useCallback(async (filters: ListingFilters = {}) => {
+    const params = Object.fromEntries(
+      Object.entries(filters).filter(([, value]) => value !== undefined && value !== '')
+    );
+    const { data } = await axiosInstance.get<ApiListing[] | { results: ApiListing[] }>('/listings/', { params });
+    setItems(listData(data).map(toItem));
+  }, [toItem]);
+
+  useEffect(() => {
+    if (!currentUserId) {
+      setCategories([]);
+      setItems([]);
+      setChatSessions([]);
+      setMessages([]);
+      setWishlist([]);
+      return;
     }
-    const newCat: Category = {
-      Category_ID: `cat_${Date.now()}`,
-      Name: trimmed,
-    };
-    setCategories((prev) => [...prev, newCat]);
-    return newCat;
-  }, [categories]);
+    void loadMarket().catch(() => undefined);
+  }, [currentUserId, loadMarket]);
 
   const getUser = useCallback(
-    (userId: string) => users.find((u) => u.User_ID === userId),
+    (userId: string) => users.find((candidate) => candidate.User_ID === userId),
     [users]
   );
-
   const getItem = useCallback(
     (itemId: string) => items.find((item) => item.Item_ID === itemId),
     [items]
   );
 
-  const addItem = useCallback(
-    (input: NewItemInput): Item => {
-      const newItem: Item = {
-        Item_ID: `item_${Date.now()}`,
-        Seller_ID: currentUserId,
-        Title: input.Title,
-        Category: input.Category,
-        Price: input.Price,
-        Condition: input.Condition,
-        Status: 'AVAILABLE',
-        Images: input.Images.length > 0 ? input.Images : ['https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=800&q=80'],
-        Description: input.Description,
-        PostedAt: new Date().toISOString(),
-        ViewCount: 0,
-      };
-
-      setItems((prev) => [newItem, ...prev]);
-      return newItem;
-    },
-    [currentUserId]
-  );
-
-  const markItemSold = useCallback(
-    (itemId: string, winningBuyerId?: string) => {
-      setItems((prev) =>
-        prev.map((item) =>
-          item.Item_ID === itemId
-            ? { ...item, Status: 'SOLD', WinningBuyer_ID: winningBuyerId }
-            : item
-        )
-      );
-
-      // If a winning buyer is provided, mark that chat session's SoldToBuyer = true
-      if (winningBuyerId) {
-        setChatSessions((prev) =>
-          prev.map((session) =>
-            session.Item_ID === itemId && session.Buyer_ID === winningBuyerId
-              ? { ...session, SoldToBuyer: true }
-              : session
-          )
-        );
-      }
-    },
-    []
-  );
-
-  const incrementItemView = useCallback((itemId: string) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.Item_ID === itemId ? { ...item, ViewCount: item.ViewCount + 1 } : item
-      )
-    );
+  const addCategory = useCallback((name: string): Category => {
+    const category: Category = { Category_ID: `pending-${Date.now()}`, Name: name.trim() };
+    setCategories((previous) => [...previous, category]);
+    void axiosInstance.post('/categories/', { name: category.Name, slug: category.Name.toLowerCase().replace(/\s+/g, '-') });
+    return category;
   }, []);
 
-  const toggleWishlist = useCallback(
-    (itemId: string) => {
-      setWishlist((prev) => {
-        const exists = prev.some(
-          (w) => w.User_ID === currentUserId && w.Item_ID === itemId
-        );
-        if (exists) {
-          return prev.filter(
-            (w) => !(w.User_ID === currentUserId && w.Item_ID === itemId)
-          );
-        } else {
-          return [
-            ...prev,
-            { User_ID: currentUserId, Item_ID: itemId, SavedAt: new Date().toISOString() },
-          ];
-        }
-      });
-    },
-    [currentUserId]
-  );
+  const addItem = useCallback(async (input: NewItemInput): Promise<Item> => {
+    const category = categories.find((candidate) => candidate.Name === input.Category);
+    const formData = new FormData();
+    formData.append('title', input.Title);
+    formData.append('description', input.Description);
+    formData.append('price', String(input.Price));
+    formData.append('condition', input.Condition);
+    if (category && /^\d+$/.test(category.Category_ID)) {
+      formData.append('category', category.Category_ID);
+    }
+    if (input.imageFile) formData.append('image', input.imageFile);
+
+    const { data } = await axiosInstance.post<ApiListing>('/listings/', formData);
+    const newItem = toItem(data);
+    setItems((previous) => [newItem, ...previous]);
+    return newItem;
+  }, [categories, toItem]);
+
+  const markItemSold = useCallback((itemId: string) => {
+    setItems((previous) => previous.map((item) => item.Item_ID === itemId ? { ...item, Status: 'SOLD' } : item));
+    void axiosInstance.patch(`/listings/${itemId}/`, { status: 'SOLD' });
+  }, []);
+
+  const incrementItemView = useCallback((_itemId: string) => undefined, []);
+  const recordViewedItem = useCallback((itemId: string) => {
+    setRecentlyViewedIds((previous) => [itemId, ...previous.filter((id) => id !== itemId)].slice(0, 10));
+  }, []);
 
   const isWishlisted = useCallback(
-    (itemId: string) => {
-      return wishlist.some(
-        (w) => w.User_ID === currentUserId && w.Item_ID === itemId
-      );
-    },
-    [wishlist, currentUserId]
+    (itemId: string) => wishlist.some((favorite) => favorite.User_ID === currentUserId && favorite.Item_ID === itemId),
+    [currentUserId, wishlist]
   );
 
-  const recordViewedItem = useCallback((itemId: string) => {
-    setRecentlyViewedIds((prev) => {
-      const filtered = prev.filter((id) => id !== itemId);
-      return [itemId, ...filtered].slice(0, 10);
+  const toggleWishlist = useCallback(async (itemId: string) => {
+    await axiosInstance.post('/favorites/', { listing_id: Number(itemId) });
+    setWishlist((previous) => {
+      const exists = previous.some((favorite) => favorite.Item_ID === itemId && favorite.User_ID === currentUserId);
+      return exists
+        ? previous.filter((favorite) => !(favorite.Item_ID === itemId && favorite.User_ID === currentUserId))
+        : [...previous, { User_ID: currentUserId, Item_ID: itemId, SavedAt: new Date().toISOString() }];
     });
-  }, []);
+  }, [currentUserId]);
 
   const getSessionsForUser = useCallback(
-    (userId: string) => {
-      return chatSessions.filter(
-        (session) => session.Buyer_ID === userId || session.Seller_ID === userId
-      );
-    },
+    (userId: string) => chatSessions.filter((session) => session.Buyer_ID === userId || session.Seller_ID === userId),
     [chatSessions]
   );
-
   const getSessionById = useCallback(
-    (sessionId: string) => chatSessions.find((s) => s.Session_ID === sessionId),
+    (sessionId: string) => chatSessions.find((session) => session.Session_ID === sessionId),
     [chatSessions]
   );
-
   const getMessagesForSession = useCallback(
-    (sessionId: string) =>
-      messages
-        .filter((m) => m.Session_ID === sessionId)
-        .sort((a, b) => new Date(a.Timestamp).getTime() - new Date(b.Timestamp).getTime()),
+    (sessionId: string) => messages.filter((message) => message.Session_ID === sessionId),
     [messages]
   );
 
-  const startChatSession = useCallback(
-    (itemId: string, sellerId: string): ChatSession => {
-      const existing = chatSessions.find(
-        (s) =>
-          s.Item_ID === itemId &&
-          s.Buyer_ID === currentUserId &&
-          s.Seller_ID === sellerId
-      );
-      if (existing) {
-        return existing;
-      }
+  const startChatSession = useCallback(async (itemId: string): Promise<ChatSession> => {
+    const existing = chatSessions.find((session) => session.Item_ID === itemId && session.Buyer_ID === currentUserId);
+    if (existing) return existing;
+    const { data } = await axiosInstance.post<ApiConversation>('/conversations/', { listing: Number(itemId) });
+    const session: ChatSession = {
+      Session_ID: String(data.id),
+      Item_ID: String(data.listing),
+      Buyer_ID: String(data.buyer),
+      Seller_ID: String(data.seller),
+      CreatedAt: data.created_at,
+    };
+    setChatSessions((previous) => [session, ...previous]);
+    return session;
+  }, [chatSessions, currentUserId]);
 
-      const newSession: ChatSession = {
-        Session_ID: `session_${Date.now()}`,
-        Item_ID: itemId,
-        Buyer_ID: currentUserId,
-        Seller_ID: sellerId,
-        CreatedAt: new Date().toISOString(),
-      };
+  const sendMessage = useCallback(async (sessionId: string, text: string): Promise<Message> => {
+    const { data } = await axiosInstance.post<ApiMessage>('/messages/', {
+      conversation: Number(sessionId),
+      text: text.trim(),
+    });
+    const message: Message = {
+      Message_ID: String(data.id),
+      Session_ID: String(data.conversation),
+      Sender_ID: String(data.sender),
+      Text: data.text,
+      Timestamp: data.timestamp,
+    };
+    setMessages((previous) => [...previous, message]);
+    return message;
+  }, []);
 
-      setChatSessions((prev) => [newSession, ...prev]);
+  const addRating = useCallback((sessionId: string, ratedUserId: string, score: number, comment: string) => {
+    setRatings((previous) => [...previous, {
+      Rating_ID: `local-${Date.now()}`,
+      Session_ID: sessionId,
+      RatedUserID: ratedUserId,
+      RaterUserID: currentUserId,
+      Score: score,
+      Comment: comment,
+      CreatedAt: new Date().toISOString(),
+    }]);
+  }, [currentUserId]);
+  const hasRated = useCallback((sessionId: string, raterUserId: string) => ratings.some((rating) => rating.Session_ID === sessionId && rating.RaterUserID === raterUserId), [ratings]);
+  const getRatingsForUser = useCallback((userId: string) => ratings.filter((rating) => rating.RatedUserID === userId), [ratings]);
 
-      // Seed initial automated inquiry greeting if wanted
-      const item = items.find((i) => i.Item_ID === itemId);
-      if (item) {
-        const initialMsg: Message = {
-          Message_ID: `msg_${Date.now()}`,
-          Session_ID: newSession.Session_ID,
-          Sender_ID: currentUserId,
-          Text: `Hi! I am interested in purchasing your "${item.Title}" listed for $${item.Price}. Is it still available?`,
-          Timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, initialMsg]);
-      }
+  const notifications = useMemo<NotificationItem[]>(() => messages.slice(-10).reverse().map((message) => ({
+    id: message.Message_ID,
+    sessionId: message.Session_ID,
+    senderName: getUser(message.Sender_ID)?.Name || 'Campus Peer',
+    senderAvatar: getUser(message.Sender_ID)?.AvatarSeed || '',
+    itemTitle: getItem(getSessionById(message.Session_ID)?.Item_ID || '')?.Title || 'Campus Listing',
+    previewText: message.Text,
+    timestamp: message.Timestamp,
+    unread: message.Sender_ID !== currentUserId,
+  })), [currentUserId, getItem, getSessionById, getUser, messages]);
 
-      return newSession;
-    },
-    [chatSessions, currentUserId, items]
-  );
-
-  const sendMessage = useCallback(
-    (
-      sessionId: string,
-      text: string,
-      media?: { type: 'image' | 'video'; url: string }
-    ): Message => {
-      const newMsg: Message = {
-        Message_ID: `msg_${Date.now()}`,
-        Session_ID: sessionId,
-        Sender_ID: currentUserId,
-        Text: text.trim(),
-        Timestamp: new Date().toISOString(),
-        ...(media ? { MediaType: media.type, MediaUrl: media.url } : {}),
-      };
-      setMessages((prev) => [...prev, newMsg]);
-      return newMsg;
-    },
-    [currentUserId]
-  );
-
-  const addRating = useCallback(
-    (sessionId: string, ratedUserId: string, score: number, comment: string) => {
-      const newRating: Rating = {
-        Rating_ID: `rating_${Date.now()}`,
-        Session_ID: sessionId,
-        RatedUserID: ratedUserId,
-        RaterUserID: currentUserId,
-        Score: score,
-        Comment: comment.trim(),
-        CreatedAt: new Date().toISOString(),
-      };
-
-      setRatings((prev) => [newRating, ...prev]);
-
-      // Update rated user's average rating in users list
-      setUsers((prev) =>
-        prev.map((u) => {
-          if (u.User_ID === ratedUserId) {
-            const userRatings = [...ratings.filter((r) => r.RatedUserID === ratedUserId), newRating];
-            const avg =
-              userRatings.reduce((sum, r) => sum + r.Score, 0) / userRatings.length;
-            return {
-              ...u,
-              Rating: parseFloat(avg.toFixed(1)),
-              RatingCount: userRatings.length,
-            };
-          }
-          return u;
-        })
-      );
-    },
-    [currentUserId, ratings]
-  );
-
-  const hasRated = useCallback(
-    (sessionId: string, raterUserId: string) => {
-      return ratings.some(
-        (r) => r.Session_ID === sessionId && r.RaterUserID === raterUserId
-      );
-    },
-    [ratings]
-  );
-
-  const getRatingsForUser = useCallback(
-    (userId: string) => ratings.filter((r) => r.RatedUserID === userId),
-    [ratings]
-  );
-
-  // Compute notifications: list of other users' recent messages in sessions the current user belongs to
-  const notifications = useMemo<NotificationItem[]>(() => {
-    const userSessions = chatSessions.filter(
-      (s) => s.Buyer_ID === currentUserId || s.Seller_ID === currentUserId
-    );
-
-    const list: NotificationItem[] = [];
-
-    for (const session of userSessions) {
-      const sessionMsgs = messages
-        .filter((m) => m.Session_ID === session.Session_ID)
-        .sort((a, b) => new Date(b.Timestamp).getTime() - new Date(a.Timestamp).getTime());
-
-      const latestMsg = sessionMsgs[0];
-      if (latestMsg) {
-        const otherUserId =
-          session.Buyer_ID === currentUserId ? session.Seller_ID : session.Buyer_ID;
-        const otherUser = users.find((u) => u.User_ID === otherUserId);
-        const item = items.find((i) => i.Item_ID === session.Item_ID);
-
-        list.push({
-          id: latestMsg.Message_ID,
-          sessionId: session.Session_ID,
-          senderName: otherUser?.Name || 'Campus Peer',
-          senderAvatar: otherUser?.AvatarSeed || '',
-          itemTitle: item?.Title || 'Campus Listing',
-          previewText: latestMsg.Text,
-          timestamp: latestMsg.Timestamp,
-          unread: latestMsg.Sender_ID !== currentUserId,
-        });
-      }
-    }
-
-    return list.sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
-  }, [chatSessions, currentUserId, messages, users, items]);
-
-  const unreadNotificationCount = useMemo(() => {
-    return notifications.filter((n) => n.unread).length;
-  }, [notifications]);
-
-  const value = useMemo<MarketContextValue>(
-    () => ({
-      users,
-      getUser,
-      items,
-      getItem,
-      addItem,
-      markItemSold,
-      incrementItemView,
-      categories,
-      addCategory,
-      wishlist,
-      toggleWishlist,
-      isWishlisted,
-      recentlyViewedIds,
-      recordViewedItem,
-      chatSessions,
-      messages,
-      getSessionsForUser,
-      getSessionById,
-      getMessagesForSession,
-      startChatSession,
-      sendMessage,
-      ratings,
-      addRating,
-      hasRated,
-      getRatingsForUser,
-      notifications,
-      unreadNotificationCount,
-    }),
-    [
-      users,
-      getUser,
-      items,
-      getItem,
-      addItem,
-      markItemSold,
-      incrementItemView,
-      categories,
-      addCategory,
-      wishlist,
-      toggleWishlist,
-      isWishlisted,
-      recentlyViewedIds,
-      recordViewedItem,
-      chatSessions,
-      messages,
-      getSessionsForUser,
-      getSessionById,
-      getMessagesForSession,
-      startChatSession,
-      sendMessage,
-      ratings,
-      addRating,
-      hasRated,
-      getRatingsForUser,
-      notifications,
-      unreadNotificationCount,
-    ]
-  );
+  const value = useMemo<MarketContextValue>(() => ({
+    users, getUser, items, fetchListings, getItem, addItem, markItemSold, incrementItemView,
+    categories, addCategory, wishlist, toggleWishlist, isWishlisted,
+    recentlyViewedIds, recordViewedItem, chatSessions, messages,
+    getSessionsForUser, getSessionById, getMessagesForSession, startChatSession,
+    sendMessage, ratings, addRating, hasRated, getRatingsForUser,
+    notifications, unreadNotificationCount: notifications.filter((notification) => notification.unread).length,
+  }), [
+    users, getUser, items, fetchListings, getItem, addItem, markItemSold, incrementItemView,
+    categories, addCategory, wishlist, toggleWishlist, isWishlisted,
+    recentlyViewedIds, recordViewedItem, chatSessions, messages,
+    getSessionsForUser, getSessionById, getMessagesForSession, startChatSession,
+    sendMessage, ratings, addRating, hasRated, getRatingsForUser, notifications,
+  ]);
 
   return <MarketContext.Provider value={value}>{children}</MarketContext.Provider>;
 }
 
 export function useMarket() {
-  const ctx = useContext(MarketContext);
-  if (!ctx) {
-    throw new Error('useMarket must be used within a MarketProvider');
-  }
-  return ctx;
+  const context = useContext(MarketContext);
+  if (!context) throw new Error('useMarket must be used within a MarketProvider');
+  return context;
 }
 
 export function useItems() {
-  const { items, getItem, addItem, markItemSold, incrementItemView } = useMarket();
-  return { items, getItem, addItem, markItemSold, incrementItemView };
+  const market = useMarket();
+  return { items: market.items, getItem: market.getItem, addItem: market.addItem, markItemSold: market.markItemSold, incrementItemView: market.incrementItemView };
 }
 
 export function useWishlist() {
-  const { wishlist, toggleWishlist, isWishlisted } = useMarket();
-  return { wishlist, toggleWishlist, isWishlisted };
+  const market = useMarket();
+  return { wishlist: market.wishlist, toggleWishlist: market.toggleWishlist, isWishlisted: market.isWishlisted };
 }
 
 export function useChat() {
-  const {
-    chatSessions,
-    messages,
-    getSessionsForUser,
-    getSessionById,
-    getMessagesForSession,
-    startChatSession,
-    sendMessage,
-  } = useMarket();
-  return {
-    chatSessions,
-    messages,
-    getSessionsForUser,
-    getSessionById,
-    getMessagesForSession,
-    startChatSession,
-    sendMessage,
-  };
+  const market = useMarket();
+  return { chatSessions: market.chatSessions, messages: market.messages, getSessionsForUser: market.getSessionsForUser, getSessionById: market.getSessionById, getMessagesForSession: market.getMessagesForSession, startChatSession: market.startChatSession, sendMessage: market.sendMessage };
 }
 
 export function useRatings() {
-  const { ratings, addRating, hasRated, getRatingsForUser } = useMarket();
-  return { ratings, addRating, hasRated, getRatingsForUser };
+  const market = useMarket();
+  return { ratings: market.ratings, addRating: market.addRating, hasRated: market.hasRated, getRatingsForUser: market.getRatingsForUser };
 }

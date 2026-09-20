@@ -51,8 +51,8 @@ function Orb({ config, mouseX, mouseY, scrollYProgress }: {
 
   const gradient =
     config.color === 'brand'
-      ? 'radial-gradient(circle, rgba(var(--brand), 0.25) 0%, rgba(var(--brand-soft), 0.12) 45%, transparent 72%)'
-      : 'radial-gradient(circle, rgba(var(--accent), 0.20) 0%, rgba(var(--brand), 0.10) 45%, transparent 72%)'
+      ? 'radial-gradient(circle, rgba(161, 161, 170, 0.15) 0%, rgba(228, 228, 231, 0.08) 45%, transparent 72%)'
+      : 'radial-gradient(circle, rgba(113, 113, 122, 0.13) 0%, rgba(212, 212, 216, 0.07) 45%, transparent 72%)'
 
   return (
     <motion.div
@@ -82,8 +82,8 @@ function Orb({ config, mouseX, mouseY, scrollYProgress }: {
 }
 
 /**
- * Spatial ambient canvas: an Apple & Antigravity ambient field of volumetric
- * gradient orbs sitting quietly behind page content. Orbs exhibit organic
+ * Spatial ambient canvas: an Apple-style ambient field of volumetric
+ * monochromatic orbs sitting quietly behind page content. Orbs exhibit organic
  * color and scale shifts, spring-driven mouse coordinate parallax, and
  * scroll reactivity.
  */

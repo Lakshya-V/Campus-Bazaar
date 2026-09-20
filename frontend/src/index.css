@@ -48,9 +48,9 @@
   --shadow-specular: var(--shadow-specular);
   --shadow-specular-lg: var(--shadow-specular-lg);
 
-  --font-display: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-text: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  --font-text: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
 
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-spring-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -95,37 +95,37 @@
   color-scheme: light;
 
   /* Surfaces */
-  --surface: 255 255 255;           /* #FFFFFF */
-  --surface-base: 245 246 248;      /* #F5F6F8 */
-  --panel: 255 255 255;             /* #FFFFFF */
+  --surface: 255 255 255;
+  --surface-base: 250 250 250;
+  --panel: 255 255 255;
   --surface-panel: 255 255 255;
-  --surface-elevated: 255 255 255;
+  --surface-elevated: 244 244 245;
 
   /* Border */
-  --line: 231 233 236;              /* #E7E9EC */
-  --borderline: 231 233 236;
+  --line: 228 228 231;
+  --borderline: 228 228 231;
 
   /* Text / Ink */
-  --ink: 17 19 24;                  /* #111318 Text Primary */
-  --ink-primary: 17 19 24;          /* #111318 */
-  --ink-secondary: 107 114 128;     /* #6B7280 Text Secondary */
-  --ink-muted: 107 114 128;         /* #6B7280 */
-  --ink-tertiary: 156 163 175;
+  --ink: 24 24 27;
+  --ink-primary: 24 24 27;
+  --ink-secondary: 113 113 122;
+  --ink-muted: 113 113 122;
+  --ink-tertiary: 161 161 170;
 
   /* Brand — Bazaar Blue */
-  --brand: 47 111 237;              /* #2F6FED Bazaar Blue primary */
-  --brand-soft: 79 140 255;         /* #4F8CFF */
-  --brand-deep: 27 79 196;          /* #1B4FC4 Blue Deep hover/active */
-  --brand-tint: 234 241 255;        /* #EAF1FF Blue Tint light bg */
+  --brand: 82 82 91;
+  --brand-soft: 161 161 170;
+  --brand-deep: 39 39 42;
+  --brand-tint: 244 244 245;
 
-  --accent: 47 111 237;             /* #2F6FED */
-  --accent-soft: 79 140 255;
+  --accent: 82 82 91;
+  --accent-soft: 161 161 170;
 
   /* Buy / Sell / Warn */
-  --buy: 47 111 237;                /* #2F6FED */
-  --sell: 47 111 237;               /* #2F6FED */
+  --buy: 39 39 42;
+  --sell: 39 39 42;
   --sell-ink: 255 255 255;
-  --warn: 224 145 43;               /* #E0912B Fair */
+  --warn: 113 113 122;
 
   /* Frosted glass fill */
   --glass-fill: 255 255 255;
@@ -167,45 +167,45 @@
 
   /* Ambient background */
   --ambient-bg:
-    radial-gradient(circle at 10% -5%, rgba(47, 111, 237, 0.07), transparent 38%),
-    radial-gradient(circle at 90% 15%, rgba(234, 241, 255, 0.9), transparent 45%),
-    radial-gradient(circle at 50% 100%, rgba(234, 241, 255, 0.6), transparent 50%);
+    radial-gradient(circle at 8% -8%, rgba(24, 24, 27, 0.045), transparent 34%),
+    radial-gradient(circle at 92% 12%, rgba(161, 161, 170, 0.13), transparent 42%),
+    radial-gradient(circle at 50% 100%, rgba(228, 228, 231, 0.45), transparent 52%);
 }
 
 .dark {
   color-scheme: dark;
 
   /* Surfaces — Ink Navy background */
-  --surface: 22 26 36;              /* #161A24 Elevated surface on ink navy */
-  --surface-base: 16 19 26;         /* #10131A Ink Navy page background */
-  --panel: 22 26 36;
-  --surface-panel: 22 26 36;
-  --surface-elevated: 30 35 48;
+  --surface: 39 39 42;
+  --surface-base: 9 9 11;
+  --panel: 39 39 42;
+  --surface-panel: 39 39 42;
+  --surface-elevated: 63 63 70;
 
   /* Border */
-  --line: 42 45 51;                 /* #2A2D33 */
-  --borderline: 42 45 51;
+  --line: 63 63 70;
+  --borderline: 63 63 70;
 
   /* Text / Ink */
-  --ink: 242 243 245;               /* #F2F3F5 Text Primary */
-  --ink-primary: 242 243 245;       /* #F2F3F5 */
-  --ink-secondary: 154 161 172;     /* #9AA1AC Text Secondary */
-  --ink-muted: 154 161 172;         /* #9AA1AC */
-  --ink-tertiary: 107 114 128;
+  --ink: 244 244 245;
+  --ink-primary: 244 244 245;
+  --ink-secondary: 161 161 170;
+  --ink-muted: 161 161 170;
+  --ink-tertiary: 113 113 122;
 
   /* Brand — Bazaar Blue with #4F8CFF glow in dark */
-  --brand: 47 111 237;              /* #2F6FED */
-  --brand-soft: 79 140 255;         /* #4F8CFF Dark glow */
-  --brand-deep: 27 79 196;          /* #1B4FC4 */
-  --brand-tint: 26 38 64;           /* Deep blue tint */
+  --brand: 161 161 170;
+  --brand-soft: 212 212 216;
+  --brand-deep: 228 228 231;
+  --brand-tint: 39 39 42;
 
-  --accent: 79 140 255;             /* #4F8CFF */
-  --accent-soft: 120 170 255;
+  --accent: 161 161 170;
+  --accent-soft: 212 212 216;
 
-  --buy: 47 111 237;                /* #2F6FED */
-  --sell: 79 140 255;               /* #4F8CFF */
+  --buy: 212 212 216;
+  --sell: 212 212 216;
   --sell-ink: 13 15 18;
-  --warn: 224 145 43;               /* #E0912B Fair */
+  --warn: 161 161 170;
 
   /* Frosted glass fill */
   --glass-fill: 22 24 28;
@@ -237,9 +237,9 @@
 
   /* Ambient background */
   --ambient-bg:
-    radial-gradient(circle at 15% -10%, rgba(47, 111, 237, 0.14), transparent 45%),
-    radial-gradient(circle at 85% 15%, rgba(79, 140, 255, 0.10), transparent 42%),
-    radial-gradient(circle at 50% 100%, rgba(27, 79, 196, 0.18), transparent 55%);
+    radial-gradient(circle at 15% -10%, rgba(244, 244, 245, 0.08), transparent 42%),
+    radial-gradient(circle at 85% 15%, rgba(161, 161, 170, 0.10), transparent 42%),
+    radial-gradient(circle at 50% 100%, rgba(63, 63, 70, 0.28), transparent 55%);
 }
 
 /* ============================================================
@@ -272,10 +272,16 @@ body {
    ============================================================ */
 
 .apple-glass {
-  background-color: rgba(var(--glass-fill), var(--glass-fill-alpha));
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(var(--borderline), 1);
+  background-color: rgba(var(--glass-fill), 0.7);
+  backdrop-filter: blur(32px) saturate(140%);
+  -webkit-backdrop-filter: blur(32px) saturate(140%);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.dark .apple-glass {
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .apple-glass-thin {

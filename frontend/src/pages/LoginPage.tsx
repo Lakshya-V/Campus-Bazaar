@@ -159,6 +159,7 @@ export default function LoginPage() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoggingInSuccess, setIsLoggingInSuccess] = useState(false);
@@ -207,9 +208,9 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       if (authMode === 'signup') {
-        await signup(fullName.trim(), trimmed);
+        await signup(fullName.trim(), trimmed, password);
       } else {
-        await login(trimmed);
+        await login(trimmed, password);
       }
       setIsLoggingInSuccess(true);
       setTimeout(() => {
@@ -227,7 +228,7 @@ export default function LoginPage() {
     setError(null);
     setIsSubmitting(true);
     try {
-      await login(demoEmail);
+      await login(demoEmail, password);
       setIsLoggingInSuccess(true);
       setTimeout(() => {
         navigate('/');
@@ -581,6 +582,21 @@ export default function LoginPage() {
                         ? 'Instant access or automatic peer provisioning with student email.'
                         : 'Must be an active student or institutional .edu email.'}
                     </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-ink-muted mb-1.5">
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      minLength={8}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="At least 8 characters"
+                      className="w-full rounded-full border border-borderline bg-surface-base py-3 px-5 text-sm text-ink placeholder-ink-muted/60 outline-none transition focus:border-[#2F6FED] focus:ring-1 focus:ring-[#2F6FED]"
+                    />
                   </div>
 
                   {/* Primary CTA Button in AMBER #F2994A */}

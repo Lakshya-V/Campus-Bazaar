@@ -34,7 +34,7 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
 export default function CategoryPage() {
   const { categoryId } = useParams<{ categoryId: string }>();
   const navigate = useNavigate();
-  const { items, categories } = useMarket();
+  const { items, categories, fetchListings } = useMarket();
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -61,6 +61,16 @@ export default function CategoryPage() {
     : matchedCustomCat
     ? getCategorySlug(matchedCustomCat.Name)
     : getCategorySlug(targetCategoryName);
+  const conditionFilter = searchParams.get('condition') || '';
+
+  useEffect(() => {
+    const categoryIdForApi = matchedCustomCat?.Category_ID;
+    void fetchListings({
+      search: searchParams.get('q') || undefined,
+      condition: conditionFilter || undefined,
+      category: categoryIdForApi && /^\d+$/.test(categoryIdForApi) ? categoryIdForApi : undefined,
+    });
+  }, [conditionFilter, fetchListings, matchedCustomCat, searchParams]);
 
   const searchQuery = searchParams.get('q') || '';
   const [sortBy, setSortBy] = useState<SortOption>('newest');
@@ -72,6 +82,7 @@ export default function CategoryPage() {
   const categoryItems = useMemo(() => {
     return items
       .filter((item) => item.Status === 'AVAILABLE')
+      .filter((item) => !conditionFilter || item.Condition === conditionFilter)
       .filter((item) => {
         // Match category name or slug
         const itemCatLower = item.Category.toLowerCase();
@@ -107,7 +118,7 @@ export default function CategoryPage() {
         if (sortBy === 'views') return b.ViewCount - a.ViewCount;
         return new Date(b.PostedAt).getTime() - new Date(a.PostedAt).getTime();
       });
-  }, [items, targetCategoryName, categoryMeta, currentSlug, searchQuery, maxBudget, sortBy]);
+  }, [items, targetCategoryName, categoryMeta, currentSlug, searchQuery, conditionFilter, maxBudget, sortBy]);
 
   function handleCategoryPillClick(catName: string) {
     if (catName === 'All Categories' || catName === 'cat_all') {
@@ -207,6 +218,22 @@ export default function CategoryPage() {
             value={maxBudget}
             onChange={(val) => setMaxBudget(val)}
           />
+          <select
+            value={conditionFilter}
+            onChange={(event) => {
+              const next = new URLSearchParams(searchParams);
+              if (event.target.value) next.set('condition', event.target.value);
+              else next.delete('condition');
+              setSearchParams(next, { replace: true });
+            }}
+            className="rounded-full border border-borderline bg-surface-base px-3 py-2 text-xs text-ink outline-none"
+            aria-label="Filter by condition"
+          >
+            <option value="">All conditions</option>
+            <option value="new">New</option>
+            <option value="good">Good</option>
+            <option value="fair">Fair</option>
+          </select>
 
           <div className="flex items-center gap-1.5 text-xs">
             <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-ink-muted mr-1">
