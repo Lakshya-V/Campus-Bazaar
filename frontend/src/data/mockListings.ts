@@ -4,9 +4,21 @@
 // and the Apple3DCard tilt/gloss/lighting is visible immediately —
 // whenever the backend call fails or returns an empty set.
 
-import type { Listing } from '../types/api';
+interface MockListing {
+  id: number;
+  title: string;
+  description: string;
+  price: string;
+  condition: 'new' | 'good' | 'fair';
+  is_favorited: boolean;
+  category: { id: number; name: string; slug: string };
+  images: { id: number; url: string; order: number }[];
+  owner: { id: number; username: string; avatar_url?: string };
+  created_at: string;
+  updated_at: string;
+}
 
-export const MOCK_LISTINGS: Listing[] = [
+export const MOCK_LISTINGS: MockListing[] = [
   {
     id: 101,
     title: 'TI-84 Plus CE Graphing Calculator',

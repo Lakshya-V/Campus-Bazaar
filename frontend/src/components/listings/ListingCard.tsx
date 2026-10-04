@@ -16,25 +16,50 @@ interface ListingCardProps {
 }
 
 const CONDITION_STYLES: Record<ListingCondition, string> = {
+  'Brand New': 'bg-[#1AA260] text-white border-[#15824d]',
+  'Like New': 'bg-[#2F6FED] text-white border-[#2358c2]',
+  Good: 'bg-[#2F6FED] text-white border-[#2358c2]',
+  'Fair Use': 'bg-[#E0912B] text-white border-[#b8731d]',
+  'Books & Notes': 'bg-[#7C5CE7] text-white border-[#6242c7]',
   new: 'bg-[#1AA260] text-white border-[#15824d]',
   good: 'bg-[#2F6FED] text-white border-[#2358c2]',
   fair: 'bg-[#E0912B] text-white border-[#b8731d]',
 };
 
 const CONDITION_LABEL: Record<ListingCondition, string> = {
-  new: 'New',
+  'Brand New': 'Brand New',
+  'Like New': 'Like New',
+  Good: 'Good',
+  'Fair Use': 'Fair Use',
+  'Books & Notes': 'Books & Notes',
+  new: 'Brand New',
   good: 'Good',
-  fair: 'Fair',
+  fair: 'Fair Use',
 };
 
 export default function ListingCard({ item }: ListingCardProps) {
   const { user } = useAuth();
-  const { getUser, isWishlisted, toggleWishlist } = useMarket();
+  const { getUser, isWishlisted, toggleWishlist, toggleItemStatus } = useMarket();
   const { triggerCartSwipe } = useCartSwipe();
 
-  const isFavorited = isWishlisted(item.Item_ID);
+  const isFavorited = isWishlisted(item.Item_ID) || Boolean(item.IsFavorited);
   const isOwnListing = user?.User_ID === item.Seller_ID;
   const seller = getUser(item.Seller_ID);
+  const sellerName = seller?.Name || item.SellerName || 'Campus Student';
+  const sellerAvatar =
+    seller?.AvatarSeed ||
+    `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(sellerName)}`;
+  const isVerified = seller?.IsVerified ?? false;
+
+  const conditionKey = item.Condition || 'Good';
+  const conditionStyle = CONDITION_STYLES[conditionKey] || CONDITION_STYLES.Good;
+  const conditionLabel = CONDITION_LABEL[conditionKey] || 'Good';
+
+  const numericPrice = Number(item.Price) || 0;
+  const formattedPrice = `₹${numericPrice.toLocaleString('en-IN', {
+    minimumFractionDigits: numericPrice % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
 
   function handleToggleFavorite(e: MouseEvent) {
     e.preventDefault();
@@ -48,6 +73,15 @@ export default function ListingCard({ item }: ListingCardProps) {
   }
 
   const coverImage = item.Images[0];
+  async function handleStatusToggle(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await toggleItemStatus(item.Item_ID);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not update listing status.');
+    }
+  }
 
   return (
     <motion.div
@@ -113,10 +147,20 @@ export default function ListingCard({ item }: ListingCardProps) {
                 className={`h-4 w-4 transition-colors ${
                   isFavorited
                     ? 'fill-[#2F6FED] text-[#2F6FED] dark:fill-[#4F8CFF] dark:text-[#4F8CFF]'
-                    : 'text-ink-secondary'
+                    : 'text-ink-secondary hover:text-ink'
                 }`}
               />
             </motion.button>
+            {isOwnListing && (
+              <button
+                type="button"
+                onClick={handleStatusToggle}
+                className="absolute bottom-3 left-3 z-30 rounded-full border border-white/40 bg-black/70 px-3 py-1.5 text-[10px] font-semibold text-white backdrop-blur-md"
+                aria-label={`Mark listing ${item.Status === 'SOLD' ? 'available' : 'sold'}`}
+              >
+                Mark {item.Status === 'SOLD' ? 'Available' : 'Sold'}
+              </button>
+            )}
           </div>
 
           {/* Layer 2: Title and metadata layer — translateZ(35px) */}
@@ -136,20 +180,21 @@ export default function ListingCard({ item }: ListingCardProps) {
               className="flex items-center justify-between text-xs text-ink-muted"
               style={{ transformStyle: 'preserve-3d' }}
             >
-              <div className="flex items-center gap-1.5 overflow-hidden">
+              <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
                 <img
-                  src={seller?.AvatarSeed || ''}
-                  alt={seller?.Name}
+                  src={sellerAvatar}
+                  alt={sellerName}
                   className="h-4 w-4 rounded-full object-cover flex-shrink-0"
                 />
-                <span className="truncate">{seller?.Name || 'Campus Peer'}</span>
-                {seller?.IsVerified && (
-                  <ShieldCheck className="h-3.5 w-3.5 text-[#2F6FED] flex-shrink-0" />
+                <span className="truncate">{sellerName}</span>
+                {isVerified && (
+                  <ShieldCheck aria-label="Verified student" className="h-3.5 w-3.5 text-[#2F6FED] flex-shrink-0" />
                 )}
               </div>
               {seller && (
-                <div className="flex-shrink-0">
-                  <RatingStars value={seller.Rating} size={11} showScore />
+                <div className="min-w-0 flex-shrink text-right">
+                  {seller.HostelBuilding && <p className="truncate text-[10px]">{seller.HostelBuilding}</p>}
+                  <RatingStars value={seller.Rating} count={seller.RatingCount} size={11} showScore />
                 </div>
               )}
             </div>
@@ -164,7 +209,7 @@ export default function ListingCard({ item }: ListingCardProps) {
                 className="font-display text-xl font-bold tracking-tight tabular-nums text-ink"
                 style={{ transform: 'translateZ(55px)' }}
               >
-                ${item.Price}
+                {formattedPrice}
               </span>
 
               {/* Category label, photo count, and condition/sold badge flush directly adjacent to each other */}
@@ -186,9 +231,9 @@ export default function ListingCard({ item }: ListingCardProps) {
                   </span>
                 ) : (
                   <span
-                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider border shadow-sm ${CONDITION_STYLES[item.Condition]}`}
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider border shadow-sm ${conditionStyle}`}
                   >
-                    {CONDITION_LABEL[item.Condition]}
+                    {conditionLabel}
                   </span>
                 )}
               </div>

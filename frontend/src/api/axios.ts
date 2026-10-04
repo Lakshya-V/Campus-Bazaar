@@ -40,6 +40,31 @@ export const axiosInstance = axios.create({
   baseURL: BASE_URL,
 });
 
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (!axios.isAxiosError(error)) {
+    return error instanceof Error ? error.message : fallback;
+  }
+
+  const responseData: unknown = error.response?.data;
+  if (typeof responseData === 'string') return responseData;
+  if (responseData && typeof responseData === 'object') {
+    const fields = Object.entries(responseData);
+    for (const [field, value] of fields) {
+      if (typeof value === 'string') return value;
+      if (Array.isArray(value)) {
+        const messages = value.filter((message): message is string => typeof message === 'string');
+        if (messages.length) {
+          return field === 'detail' || field === 'non_field_errors'
+            ? messages.join(' ')
+            : `${field}: ${messages.join(' ')}`;
+        }
+      }
+    }
+  }
+
+  return error.message || fallback;
+}
+
 axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = getAccessToken();
   if (token) {

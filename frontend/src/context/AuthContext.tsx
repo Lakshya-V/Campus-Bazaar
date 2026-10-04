@@ -25,7 +25,9 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
-  signup: (name: string, email: string, password: string) => Promise<boolean>;
+  signup: (name: string, email: string, password: string) => Promise<void>;
+  sendVerificationCode: (email: string) => Promise<void>;
+  verifyEmail: (email: string, otpCode: string, password: string) => Promise<boolean>;
   switchUser: (userId: string) => void;
   logout: () => Promise<void>;
   demoUsers: User[];
@@ -36,6 +38,10 @@ interface ProfileResponse {
   username: string;
   university_email: string;
   is_verified_student: boolean;
+  hostel_building: string;
+  phone_number: string;
+  rating_average: number;
+  rating_count: number;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -46,11 +52,13 @@ function toUser(profile: ProfileResponse): User {
     User_ID: String(profile.id),
     Name: profile.username,
     InstitutionalEmail: profile.university_email,
-    Role: 'Student • Verified Campus Peer',
+    Role: 'Student',
     AvatarSeed: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(profile.username)}`,
-    Rating: 5,
-    RatingCount: 0,
+    Rating: profile.rating_average ?? 0,
+    RatingCount: profile.rating_count ?? 0,
     IsVerified: profile.is_verified_student,
+    HostelBuilding: profile.hostel_building,
+    PhoneNumber: profile.phone_number,
   };
 }
 
@@ -127,6 +135,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string): Promise<boolean> => {
       setIsLoading(true);
       try {
+        if (!/^[^\s@]+@vitstudent\.ac\.in$/i.test(email.trim())) {
+          throw new Error('Use your @vitstudent.ac.in email address.');
+        }
         const { data } = await axiosInstance.post<{ access: string; refresh: string }>(
           '/auth/login/',
           { username: email.trim().toLowerCase(), password }
@@ -142,13 +153,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signup = useCallback(
-    async (name: string, email: string, password: string): Promise<boolean> => {
+    async (name: string, email: string, password: string): Promise<void> => {
       setIsLoading(true);
       try {
+        if (!/^[^\s@]+@vitstudent\.ac\.in$/i.test(email.trim())) {
+          throw new Error('Use your @vitstudent.ac.in email address.');
+        }
         await axiosInstance.post('/auth/register/', {
           username: name.trim(),
           university_email: email.trim().toLowerCase(),
           password,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  const sendVerificationCode = useCallback(async (email: string): Promise<void> => {
+    await axiosInstance.post('/auth/send-otp/', {
+      university_email: email.trim().toLowerCase(),
+    });
+  }, []);
+
+  const verifyEmail = useCallback(
+    async (email: string, otpCode: string, password: string): Promise<boolean> => {
+      setIsLoading(true);
+      try {
+        await axiosInstance.post('/auth/verify-otp/', {
+          university_email: email.trim().toLowerCase(),
+          otp_code: otpCode,
         });
         return await login(email, password);
       } finally {
@@ -169,6 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setAccessTokenState(null);
     setRefreshTokenState(null);
+    window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT));
   }, []);
 
   const value = useMemo<AuthContextValue>(
@@ -180,11 +216,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       login,
       signup,
+      sendVerificationCode,
+      verifyEmail,
       switchUser,
       logout,
       demoUsers: INITIAL_USERS,
     }),
-    [user, accessToken, refreshToken, isLoading, login, signup, switchUser, logout]
+    [user, accessToken, refreshToken, isLoading, login, signup, sendVerificationCode, verifyEmail, switchUser, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,19 +1,19 @@
 // src/pages/ChatPage.tsx
 import { useState, useEffect, useRef, useMemo, type FormEvent } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
   Send,
   ShieldCheck,
-  CheckCircle2,
   Lock,
   Sparkles,
-  AlertCircle,
   Paperclip,
   X,
-  Video as VideoIcon,
-  Maximize2,
+  MessageSquare,
+  ShoppingBag,
+  ExternalLink,
+  Search,
 } from 'lucide-react';
 import { useMarket } from '../context/MarketContext';
 import { useAuth } from '../context/AuthContext';
@@ -22,24 +22,31 @@ import {
   POP_SPRING,
   MODAL_BACKDROP_VARIANTS,
   MODAL_CONTENT_VARIANTS,
-  HANDSHAKE_PULSE_VARIANTS,
 } from '../lib/motion';
 
 export default function ChatPage() {
-  const { sessionId } = useParams<{ sessionId: string }>();
+  const { sessionId } = useParams<{ sessionId?: string }>();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const {
+    chatSessions,
     getSessionById,
     getMessagesForSession,
+    fetchSessionMessages,
+    loadingMessagesFor,
     sendMessage,
     getItem,
     getUser,
     markItemSold,
     addRating,
     hasRated,
+    markNotificationsRead,
   } = useMarket();
 
+  const [searchFilter, setSearchFilter] = useState('');
   const [inputMessage, setInputMessage] = useState('');
+  const [messageError, setMessageError] = useState<string | null>(null);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<{
     file: File;
     url: string;
@@ -52,22 +59,76 @@ export default function ChatPage() {
   const [ratingScore, setRatingScore] = useState(5);
   const [ratingComment, setRatingComment] = useState('');
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
-  const [isHandshaking, setIsHandshaking] = useState(true);
+  const [ratingError, setRatingError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const session = getSessionById(sessionId || '');
-  const item = session ? getItem(session.Item_ID) : undefined;
+  // User's conversations
+  const mySessions = useMemo(() => {
+    if (!user) return [];
+    return chatSessions.filter(
+      (s) => s.Buyer_ID === user.User_ID || s.Seller_ID === user.User_ID
+    );
+  }, [chatSessions, user]);
+
+  // Selected session: from route param or fallback to first session if on desktop
+  const activeSession = useMemo(() => {
+    if (sessionId) {
+      return getSessionById(sessionId) || mySessions.find((s) => s.Session_ID === sessionId);
+    }
+    return undefined;
+  }, [sessionId, getSessionById, mySessions]);
+
+  // If a session is active, fetch its messages from backend
+  useEffect(() => {
+    const activeSessionId = activeSession?.Session_ID;
+    if (activeSessionId) {
+      void fetchSessionMessages(activeSessionId);
+      void markNotificationsRead(activeSessionId).catch((error) => {
+        console.error('Failed to mark chat notifications as read:', error);
+      });
+    }
+  }, [activeSession?.Session_ID, fetchSessionMessages, markNotificationsRead]);
+
+  const activeItem = activeSession ? getItem(activeSession.Item_ID) : undefined;
   const messages = useMemo(
-    () => (session ? getMessagesForSession(session.Session_ID) : []),
-    [session, getMessagesForSession]
+    () => (activeSession ? getMessagesForSession(activeSession.Session_ID) : []),
+    [activeSession, getMessagesForSession]
   );
 
-  const isSeller = session?.Seller_ID === user?.User_ID;
-  const isBuyer = session?.Buyer_ID === user?.User_ID;
-  const otherUserId = isSeller ? session?.Buyer_ID : session?.Seller_ID;
+  const isSeller = activeSession?.Seller_ID === user?.User_ID;
+  const isBuyer = activeSession?.Buyer_ID === user?.User_ID;
+  const otherUserId = isSeller ? activeSession?.Buyer_ID : activeSession?.Seller_ID;
   const otherUser = otherUserId ? getUser(otherUserId) : undefined;
+  const otherUserName =
+    otherUser?.Name ||
+    (isSeller ? activeSession?.BuyerName : activeSession?.SellerName) ||
+    'Campus Peer';
+
+  // Auto-scroll on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, sessionId]);
+
+  // Filtered session list for left sidebar
+  const filteredSessions = useMemo(() => {
+    if (!searchFilter.trim()) return mySessions;
+    const q = searchFilter.toLowerCase();
+    return mySessions.filter((s) => {
+      const item = getItem(s.Item_ID);
+      const isS = s.Seller_ID === user?.User_ID;
+      const oId = isS ? s.Buyer_ID : s.Seller_ID;
+      const oUser = getUser(oId);
+      const oName = oUser?.Name || (isS ? s.BuyerName : s.SellerName) || '';
+      const title = item?.Title || s.ListingTitle || '';
+      return oName.toLowerCase().includes(q) || title.toLowerCase().includes(q);
+    });
+  }, [mySessions, searchFilter, getItem, getUser, user]);
+
+  function handleSelectSession(sid: string) {
+    navigate(`/chat/${sid}`);
+  }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -91,458 +152,569 @@ export default function ChatPage() {
     }
   }
 
-  // Handshake pulse on mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsHandshaking(false);
-    }, 450);
-    return () => clearTimeout(timer);
-  }, [sessionId]);
-
-  // Auto-scroll on new messages
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isHandshaking]);
-
-  if (!session || !item) {
-    return (
-      <div className="mx-auto max-w-lg px-4 py-20 text-center">
-        <div className="rounded-3xl border border-borderline bg-surface/80 p-8 shadow-xl backdrop-blur-2xl">
-          <AlertCircle className="mx-auto h-12 w-12 text-status-danger" />
-          <h2 className="mt-4 font-display text-xl font-bold text-ink">
-            Chat Thread Not Found
-          </h2>
-          <p className="mt-2 text-xs text-ink-muted">
-            This message session could not be located.
-          </p>
-          <Link
-            to="/"
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#2F6FED] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#1B4FC4]"
-          >
-            Back to Browse
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const currentSession = session;
-  const currentItem = item;
-
-  // Sold states
-  const isSold = currentItem.Status === 'SOLD';
-  const isWinningBuyer = isBuyer && (currentSession.SoldToBuyer || currentItem.WinningBuyer_ID === user?.User_ID);
+  const isSold = activeItem?.Status === 'SOLD';
+  const isWinningBuyer =
+    isBuyer && (activeSession?.SoldToBuyer || activeItem?.WinningBuyer_ID === user?.User_ID);
   const isLostBuyer = isBuyer && isSold && !isWinningBuyer;
+  const alreadyRated = user && activeSession ? hasRated(activeSession.Session_ID, user.User_ID) : false;
 
-  const alreadyRated = user ? hasRated(currentSession.Session_ID, user.User_ID) : false;
-
-  function handleSendMessage(e: FormEvent) {
+  async function handleSendMessage(e: FormEvent) {
     e.preventDefault();
-    if ((!inputMessage.trim() && !pendingMedia) || isLostBuyer) return;
-    sendMessage(
-      currentSession.Session_ID,
-      inputMessage,
-      pendingMedia ? { type: pendingMedia.type, url: pendingMedia.url } : undefined
-    );
-    setInputMessage('');
-    setPendingMedia(null);
+    if (
+      !activeSession ||
+      (!inputMessage.trim() && !pendingMedia) ||
+      isLostBuyer ||
+      isSendingMessage
+    ) return;
+    const textToSend = inputMessage;
+    const mediaToSend = pendingMedia
+      ? { type: pendingMedia.type, url: pendingMedia.url, file: pendingMedia.file }
+      : undefined;
+    setMessageError(null);
+    setIsSendingMessage(true);
+    try {
+      await sendMessage(activeSession.Session_ID, textToSend, mediaToSend);
+      setInputMessage('');
+      setPendingMedia(null);
+    } catch {
+      setMessageError('Message could not be sent. Please try again.');
+    } finally {
+      setIsSendingMessage(false);
+    }
   }
 
-  function handleConfirmMarkSold() {
+  async function handleConfirmMarkSold() {
+    if (!activeItem || !activeSession) return;
     setShowSoldConfirm(false);
-    setDealClosedStamp(true);
-    markItemSold(currentItem.Item_ID, currentSession.Buyer_ID);
-    setTimeout(() => {
-      setDealClosedStamp(false);
-    }, 2400);
+    try {
+      await markItemSold(activeItem.Item_ID, activeSession.Buyer_ID);
+      setDealClosedStamp(true);
+      setTimeout(() => setDealClosedStamp(false), 2400);
+    } catch (error) {
+      setMessageError(error instanceof Error ? error.message : 'Could not update listing status.');
+    }
   }
 
-  function handleRateSubmit(e: FormEvent) {
+  async function handleRateSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!otherUserId) return;
-    addRating(currentSession.Session_ID, otherUserId, ratingScore, ratingComment);
-    setRatingSubmitted(true);
+    if (!activeSession || !otherUserId) return;
+    setRatingError(null);
+    try {
+      await addRating(activeSession.Session_ID, otherUserId, ratingScore, ratingComment);
+      setRatingSubmitted(true);
+    } catch (error) {
+      setRatingError(error instanceof Error ? error.message : 'Could not submit your rating.');
+    }
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 pb-12">
-      {/* Back button */}
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+      {/* Top Breadcrumb / Back Link */}
+      <div className="mb-4 flex items-center justify-between">
         <Link
-          to={`/item/${item.Item_ID}`}
-          className="inline-flex items-center gap-2 text-xs font-semibold text-ink-muted hover:text-[#2F6FED] dark:hover:text-[#4F8CFF] transition-colors"
+          to="/"
+          className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-ink-muted transition-colors hover:text-ink"
         >
-          <ArrowLeft className="h-4 w-4" />
-          Back to listing
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back to Bazaar
         </Link>
-        <span className="text-[11px] text-ink-muted">
-          Session ID: <span className="font-mono">{session.Session_ID}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
+          Campus Direct Messaging
         </span>
       </div>
 
-      {/* Handshake Connecting Animation if just mounting */}
-      <AnimatePresence>
-        {isHandshaking && (
-          <motion.div
-            variants={HANDSHAKE_PULSE_VARIANTS}
-            animate="animate"
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="flex items-center justify-center gap-2 rounded-2xl border border-[#2F6FED]/20 bg-[#2F6FED]/10 p-3 text-xs font-medium text-[#2F6FED] dark:text-[#4F8CFF]"
-          >
-            <Sparkles className="h-4 w-4 animate-spin" />
-            <span>Establishing secure peer connection...</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Chat Container */}
-      <div className="flex h-[75vh] flex-col overflow-hidden rounded-3xl border border-black/5 bg-white/70 shadow-[0_20px_50px_rgba(0,0,0,0.08)] backdrop-blur-2xl dark:border-white/10 dark:bg-zinc-900/70">
-        {/* Pinned Item Summary Card at Top (Compact Version of Detail Card) */}
-        <div className="border-b border-borderline bg-surface-base/60 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {/* Thumbnail, Title, Display Price, Condition */}
-            <div className="flex items-center gap-3.5 min-w-0">
-              <img
-                src={item.Images[0]}
-                alt={item.Title}
-                className="h-14 w-14 rounded-xl object-cover flex-shrink-0 border border-borderline"
-              />
-              <div className="min-w-0 space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-display text-xl font-bold tracking-tight text-ink">
-                    ${item.Price}
-                  </span>
-                  <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-surface-elevated text-ink-secondary border border-borderline">
-                    {item.Category}
-                  </span>
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-                      item.Status === 'AVAILABLE'
-                        ? 'bg-[#12A150] text-white dark:text-[#0D0F12]'
-                        : 'bg-surface-elevated text-ink-muted border border-borderline'
-                    }`}
-                  >
-                    {item.Status}
-                  </span>
-                </div>
-                <h3 className="truncate font-semibold text-xs sm:text-sm text-ink font-body">
-                  {item.Title}
-                </h3>
-                <p className="text-[11px] text-ink-muted font-medium">
-                  {isBuyer
-                    ? `Negotiating to buy from ${otherUser?.Name || 'Seller'}`
-                    : `Inquiry from ${otherUser?.Name || 'Buyer'}`}
-                </p>
-              </div>
-            </div>
-
-            {/* Other User Sub-Chip */}
-            {otherUser && (
-              <div className="flex items-center gap-2 rounded-full border border-borderline bg-surface px-3 py-1.5 text-xs">
-                <img
-                  src={otherUser.AvatarSeed}
-                  alt={otherUser.Name}
-                  className="h-5 w-5 rounded-full object-cover border border-borderline"
-                />
-                <span className="text-ink font-medium text-xs">{otherUser.Name}</span>
-                {otherUser.IsVerified && (
-                  <ShieldCheck className="h-3.5 w-3.5 text-[#2F6FED]" />
-                )}
-                <span className="text-[11px] text-[#F2A93B] font-semibold ml-1">
-                  {otherUser.Rating}★
+      {/* Main Split-Screen Container */}
+      <div className="flex h-[78vh] sm:h-[82vh] overflow-hidden rounded-3xl border border-borderline bg-surface shadow-lg backdrop-blur-xl">
+        {/* ════════════════════════════════════════════════════════════════
+            LEFT COLUMN: THREAD LIST (Active on mobile if no session)
+            ════════════════════════════════════════════════════════════════ */}
+        <div
+          className={`${
+            activeSession ? 'hidden md:flex' : 'flex'
+          } w-full md:w-80 lg:w-96 flex-col border-r border-borderline bg-surface-base/60 backdrop-blur-md`}
+        >
+          {/* Header */}
+          <div className="p-4 border-b border-borderline">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <h1 className="font-display text-xl font-bold tracking-tight text-ink">
+                  Messages
+                </h1>
+                <span className="rounded-full bg-[#2F6FED]/15 px-2 py-0.5 text-[11px] font-bold text-[#2F6FED] dark:text-[#4F8CFF]">
+                  {mySessions.length}
                 </span>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Message Thread Area */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3.5 bg-surface-base/20">
-          {/* Privacy Protection Banner — Strict Requirement */}
-          <div className="mx-auto max-w-sm rounded-full border border-borderline bg-surface px-4 py-1.5 text-center text-[10px] uppercase tracking-wider text-ink-muted shadow-xs">
-            <Lock className="inline h-3 w-3 mr-1 opacity-60" />
-            Campus Peer Privacy: Direct messages are protected.
-          </div>
-
-          {/* Message Bubbles: Tail-less flat modern style */}
-          {messages.map((msg) => {
-            const isMe = msg.Sender_ID === user?.User_ID;
-
-            return (
-              <motion.div
-                key={msg.Message_ID}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.15 }}
-                className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[85%] sm:max-w-md rounded-2xl p-3 sm:p-4 text-xs sm:text-sm leading-relaxed shadow-xs ${
-                    isMe
-                      ? 'bg-[#2F6FED] text-white'
-                      : 'bg-surface border border-borderline text-ink'
-                  }`}
-                >
-                  {/* Attached Image with click-to-view lightbox */}
-                  {msg.MediaType === 'image' && msg.MediaUrl && (
-                    <div className="mb-2 relative group overflow-hidden rounded-xl border border-white/15 bg-black/10">
-                      <img
-                        src={msg.MediaUrl}
-                        alt="Shared media"
-                        className="max-h-64 w-full object-cover rounded-xl cursor-pointer hover:opacity-95 transition-opacity"
-                        onClick={() => setLightboxUrl(msg.MediaUrl || null)}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setLightboxUrl(msg.MediaUrl || null)}
-                        className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Click to view full image"
-                      >
-                        <Maximize2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Attached Video with native controls */}
-                  {msg.MediaType === 'video' && msg.MediaUrl && (
-                    <div className="mb-2 overflow-hidden rounded-xl border border-white/15 bg-black">
-                      <video
-                        src={msg.MediaUrl}
-                        controls
-                        playsInline
-                        className="max-h-64 w-full rounded-xl"
-                      />
-                    </div>
-                  )}
-
-                  {msg.Text && <p className="font-body whitespace-pre-wrap">{msg.Text}</p>}
-                  <span
-                    className={`mt-1.5 block text-[10px] text-right font-mono ${
-                      isMe ? 'text-white/75' : 'text-ink-muted'
-                    }`}
-                  >
-                    {new Date(msg.Timestamp).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                </div>
-              </motion.div>
-            );
-          })}
-
-          {/* Inline "Rate this buyer" prompt if seller marked sold in this thread */}
-          {isSeller && isSold && !alreadyRated && !ratingSubmitted && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="mx-auto max-w-md rounded-2xl border border-borderline bg-surface p-5 text-center shadow-xs"
-            >
-              <div className="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wider bg-[#1AA260] text-white dark:text-[#0D0F12] mb-2">
-                Deal Closed! Rate this buyer
-              </div>
-              <p className="text-xs text-ink-muted font-body">
-                How was your campus hand-off meetup with {otherUser?.Name}?
-              </p>
-
-              <form onSubmit={handleRateSubmit} className="mt-4 space-y-3">
-                <div className="flex justify-center">
-                  <RatingStars
-                    value={ratingScore}
-                    interactive
-                    onChange={setRatingScore}
-                    size={24}
-                  />
-                </div>
-                <input
-                  type="text"
-                  value={ratingComment}
-                  onChange={(e) => setRatingComment(e.target.value)}
-                  placeholder="Optional praise (e.g. prompt meetup, exact cash)..."
-                  className="w-full rounded-full border border-borderline bg-surface-base px-4 py-2 text-xs text-ink placeholder-ink-muted/50 outline-none"
-                />
-                <button
-                  type="submit"
-                  className="rounded-full bg-[#111318] text-[#FFFFFF] dark:bg-[#F2F3F5] dark:text-[#0D0F12] px-5 py-2 text-xs font-semibold uppercase tracking-wider shadow-xs hover:opacity-90 transition-opacity"
-                >
-                  Submit Buyer Rating
-                </button>
-              </form>
-            </motion.div>
-          )}
-
-          {/* Inline "Rate this seller" prompt if buyer won the item */}
-          {isWinningBuyer && !alreadyRated && !ratingSubmitted && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="mx-auto max-w-md rounded-2xl border border-borderline bg-surface p-5 text-center shadow-xs"
-            >
-              <div className="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wider bg-[#1AA260] text-white dark:text-[#0D0F12] mb-2">
-                Deal Closed! Rate this seller
-              </div>
-              <p className="text-xs text-ink-muted font-body">
-                Share your experience meeting up with {otherUser?.Name}.
-              </p>
-
-              <form onSubmit={handleRateSubmit} className="mt-4 space-y-3">
-                <div className="flex justify-center">
-                  <RatingStars
-                    value={ratingScore}
-                    interactive
-                    onChange={setRatingScore}
-                    size={24}
-                  />
-                </div>
-                <input
-                  type="text"
-                  value={ratingComment}
-                  onChange={(e) => setRatingComment(e.target.value)}
-                  placeholder="Review condition and handoff..."
-                  className="w-full rounded-full border border-borderline bg-surface-base px-4 py-2 text-xs text-ink placeholder-ink-muted/50 outline-none"
-                />
-                <button
-                  type="submit"
-                  className="rounded-full bg-[#F2994A] text-[#10131A] px-5 py-2 text-xs font-semibold uppercase tracking-wider shadow-xs hover:bg-[#D97B2B] transition-colors"
-                >
-                  Submit Seller Rating
-                </button>
-              </form>
-            </motion.div>
-          )}
-
-          {/* Rating Submitted Acknowledgment */}
-          {(alreadyRated || ratingSubmitted) && (
-            <div className="mx-auto max-w-xs rounded-full border border-borderline bg-surface p-2 text-center text-xs font-semibold text-[#12A150]">
-              ✓ Rating recorded! Thank you for supporting campus trust.
             </div>
-          )}
 
-          {/* Muted "Sold to someone else" banner for losing buyers */}
-          {isLostBuyer && (
-            <div className="mx-auto max-w-sm rounded-full border border-borderline bg-surface-base p-3 text-center text-xs font-medium text-ink-muted">
-              This item has been sold to another student. Messages are closed.
-            </div>
-          )}
-
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Seller-Only Action Bar (Mark as Sold) — Distinct Pill Button Strip in AMBER #F2994A */}
-        {isSeller && !isSold && (
-          <div className="border-t border-borderline bg-surface px-4 py-2.5 flex items-center justify-between">
-            <span className="text-[11px] font-medium text-ink-muted">
-              Ready to finalize handoff with {otherUser?.Name}?
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowSoldConfirm(true)}
-              className="flex items-center gap-1.5 rounded-full bg-[#F2994A] px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-[#10131A] shadow-xs hover:bg-[#D97B2B] transition-colors"
-            >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              <span>Mark as Sold to this buyer</span>
-            </button>
-          </div>
-        )}
-
-        {/* Input Bar with Attachment Preview */}
-        <div className="border-t border-borderline bg-surface p-3 sm:p-4">
-          {/* Pending Media Attachment Preview */}
-          <AnimatePresence>
-            {pendingMedia && (
-              <motion.div
-                initial={{ opacity: 0, y: 10, height: 0 }}
-                animate={{ opacity: 1, y: 0, height: 'auto' }}
-                exit={{ opacity: 0, y: 5, height: 0 }}
-                className="mb-3 flex items-center gap-3 rounded-xl border border-borderline bg-surface-base p-2.5"
-              >
-                <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg border border-borderline bg-surface-elevated">
-                  {pendingMedia.type === 'image' ? (
-                    <img
-                      src={pendingMedia.url}
-                      alt="Attachment preview"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-[#10131A] text-white">
-                      <VideoIcon className="h-6 w-6 text-[#2F6FED]" />
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="inline-flex items-center rounded-full bg-[#2F6FED]/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[#2F6FED]">
-                      {pendingMedia.type}
-                    </span>
-                    <span className="truncate text-xs font-medium text-ink">
-                      {pendingMedia.name}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-[11px] text-ink-muted">
-                    Ready to send with message
-                  </p>
-                </div>
+            {/* Thread Search Bar */}
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-muted" />
+              <input
+                type="text"
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                placeholder="Search peers or listings..."
+                className="w-full rounded-full border border-borderline bg-surface px-8 py-1.5 text-xs text-ink placeholder-ink-muted/50 outline-none transition focus:border-[#2F6FED]"
+              />
+              {searchFilter && (
                 <button
                   type="button"
-                  onClick={handleRemovePendingMedia}
-                  className="flex h-7 w-7 items-center justify-center rounded-full border border-borderline bg-surface text-ink-muted hover:text-status-danger hover:bg-surface-elevated transition-colors"
-                  title="Remove attachment"
+                  onClick={() => setSearchFilter('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink text-xs"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-3 w-3" />
                 </button>
-              </motion.div>
+              )}
+            </div>
+          </div>
+
+          {/* Thread List Items */}
+          <div className="flex-1 overflow-y-auto divide-y divide-borderline/50 p-2 space-y-1">
+            {filteredSessions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full p-6 text-center text-ink-muted">
+                <MessageSquare className="h-10 w-10 opacity-30 mb-2" />
+                <p className="text-xs font-semibold text-ink">No conversations yet</p>
+                <p className="text-[11px] mt-1 text-ink-muted max-w-[200px]">
+                  When you inquire on campus listings or buyers message you, chats will appear here.
+                </p>
+                <Link
+                  to="/"
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#2F6FED] px-4 py-2 text-[11px] font-semibold text-white shadow-xs hover:bg-[#1B4FC4]"
+                >
+                  <ShoppingBag className="h-3 w-3" />
+                  Browse Listings
+                </Link>
+              </div>
+            ) : (
+              filteredSessions.map((session) => {
+                const sItem = getItem(session.Item_ID);
+                const sIsSeller = session.Seller_ID === user?.User_ID;
+                const sOtherId = sIsSeller ? session.Buyer_ID : session.Seller_ID;
+                const sOtherUser = getUser(sOtherId);
+                const sOtherName =
+                  sOtherUser?.Name ||
+                  (sIsSeller ? session.BuyerName : session.SellerName) ||
+                  'Campus Peer';
+                const sOtherAvatar =
+                  sOtherUser?.AvatarSeed ||
+                  `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(sOtherName)}`;
+                const isSelected = activeSession?.Session_ID === session.Session_ID;
+                const sMessages = getMessagesForSession(session.Session_ID);
+                const lastMsg = sMessages[sMessages.length - 1];
+                const previewText =
+                  lastMsg?.Text || session.LastMessageText || 'Tap to open conversation...';
+                const itemTitle = sItem?.Title || session.ListingTitle || 'Campus Listing';
+                const itemPrice = sItem?.Price ?? session.ListingPrice;
+
+                return (
+                  <button
+                    key={session.Session_ID}
+                    type="button"
+                    onClick={() => handleSelectSession(session.Session_ID)}
+                    className={`w-full text-left rounded-2xl p-3 transition-all cursor-pointer flex items-start gap-3 ${
+                      isSelected
+                        ? 'bg-[#2F6FED]/10 border border-[#2F6FED]/30 text-ink dark:bg-[#2F6FED]/20'
+                        : 'hover:bg-surface-elevated/80 border border-transparent'
+                    }`}
+                  >
+                    <div className="relative flex-shrink-0">
+                      <img
+                        src={sOtherAvatar}
+                        alt={sOtherName}
+                        className="h-11 w-11 rounded-xl object-cover ring-1 ring-borderline"
+                      />
+                      {(sOtherUser?.IsVerified ?? false) && (
+                        <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#2F6FED] text-white ring-1 ring-surface text-[9px]">
+                          ✓
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-semibold text-xs text-ink truncate">
+                          {sOtherName}
+                        </span>
+                        {sIsSeller ? (
+                          <span className="text-[9px] uppercase tracking-wider font-semibold text-ink-muted bg-surface px-1.5 py-0.5 rounded-md border border-borderline flex-shrink-0">
+                            Buyer
+                          </span>
+                        ) : (
+                          <span className="text-[9px] uppercase tracking-wider font-semibold text-[#2F6FED] bg-[#2F6FED]/10 px-1.5 py-0.5 rounded-md flex-shrink-0">
+                            Seller
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Linked item snippet */}
+                      <p className="text-[11px] font-medium text-ink-muted truncate mt-0.5 flex items-center gap-1">
+                        <span className="truncate">{itemTitle}</span>
+                        {itemPrice !== undefined && (
+                          <span className="text-ink font-semibold flex-shrink-0">
+                            · ₹{Number(itemPrice).toLocaleString('en-IN')}
+                          </span>
+                        )}
+                      </p>
+
+                      {/* Last message preview */}
+                      <p className="text-[11px] text-ink-muted/80 truncate mt-1 line-clamp-1">
+                        {previewText}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })
             )}
-          </AnimatePresence>
+          </div>
+        </div>
 
-          <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-            {/* Hidden File Input */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept="image/*,video/*"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
+        {/* ════════════════════════════════════════════════════════════════
+            RIGHT COLUMN: ACTIVE CHAT CONVERSATION VIEW
+            ════════════════════════════════════════════════════════════════ */}
+        <div
+          className={`${
+            activeSession ? 'flex' : 'hidden md:flex'
+          } flex-1 flex-col h-full bg-surface relative`}
+        >
+          {activeSession ? (
+            <>
+              {/* Active Conversation Top Bar */}
+              <div className="flex items-center justify-between border-b border-borderline px-4 py-3 bg-surface/90 backdrop-blur-md">
+                <div className="flex items-center gap-3 min-w-0">
+                  {/* Mobile Back Button */}
+                  <button
+                    type="button"
+                    onClick={() => navigate('/chat')}
+                    className="md:hidden flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated text-ink hover:bg-borderline transition-colors mr-1"
+                    title="Back to conversation list"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </button>
 
-            {/* Paperclip Attachment Button */}
-            <button
-              type="button"
-              disabled={isLostBuyer}
-              onClick={() => fileInputRef.current?.click()}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-borderline bg-surface-base text-ink hover:text-[#2F6FED] hover:border-[#2F6FED] transition-colors disabled:opacity-40"
-              title="Attach image or video"
-            >
-              <Paperclip className="h-4 w-4" />
-            </button>
+                  <div className="relative flex-shrink-0">
+                    <img
+                      src={
+                        otherUser?.AvatarSeed ||
+                        `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
+                          otherUserName
+                        )}`
+                      }
+                      alt={otherUserName}
+                      className="h-10 w-10 rounded-xl object-cover ring-1 ring-borderline"
+                    />
+                    {(otherUser?.IsVerified ?? false) && (
+                      <ShieldCheck className="absolute -bottom-1 -right-1 h-4 w-4 text-[#2F6FED]" />
+                    )}
+                  </div>
 
-            <input
-              type="text"
-              disabled={isLostBuyer}
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              placeholder={
-                isLostBuyer
-                  ? 'Listing is closed'
-                  : pendingMedia
-                  ? 'Add a caption or note (optional)...'
-                  : 'Type a message (e.g. proposing campus library meetup)...'
-              }
-              className="flex-1 rounded-full border border-borderline bg-surface-base px-4 py-2.5 text-xs sm:text-sm text-ink placeholder-ink-muted/50 outline-none transition focus:border-[#2F6FED] disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={(!inputMessage.trim() && !pendingMedia) || isLostBuyer}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#F2994A] text-[#10131A] transition-transform active:scale-95 hover:bg-[#D97B2B] disabled:opacity-40"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          </form>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <h2 className="font-semibold text-sm text-ink truncate">
+                        {otherUserName}
+                      </h2>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
+                        · {isSeller ? 'Prospective Buyer' : 'Listing Seller'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-ink-muted truncate">
+                      {otherUser?.InstitutionalEmail || 'Verified Student Peer'}
+                    </p>
+                    {otherUser?.HostelBuilding && (
+                      <p className="text-[11px] text-ink-muted truncate">{otherUser.HostelBuilding}</p>
+                    )}
+                    {otherUser && (
+                      <RatingStars
+                        value={otherUser.Rating}
+                        count={otherUser.RatingCount}
+                        size={10}
+                        showScore
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Linked Listing Pill Badge */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {activeItem ? (
+                    <div className="flex items-center gap-2 rounded-2xl border border-borderline bg-surface-base px-3 py-1.5">
+                      {activeItem.Images[0] && (
+                        <img
+                          src={activeItem.Images[0]}
+                          alt={activeItem.Title}
+                          className="h-7 w-7 rounded-lg object-cover"
+                        />
+                      )}
+                      <div className="text-left hidden sm:block">
+                        <span className="block text-[11px] font-semibold text-ink max-w-[130px] truncate">
+                          {activeItem.Title}
+                        </span>
+                        <span className="block font-display text-[11px] font-bold text-ink">
+                          ₹{activeItem.Price.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <Link
+                        to={`/item/${activeItem.Item_ID}`}
+                        className="rounded-lg p-1 text-ink-muted hover:text-[#2F6FED] transition-colors"
+                        title="Open Listing Page"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
+                  ) : activeSession.ListingTitle ? (
+                    <div className="flex items-center gap-2 rounded-2xl border border-borderline bg-surface-base px-3 py-1.5">
+                      <span className="text-xs font-semibold text-ink max-w-[140px] truncate">
+                        {activeSession.ListingTitle}
+                      </span>
+                      {activeSession.ListingPrice !== undefined && (
+                        <span className="text-xs font-bold text-ink">
+                          ₹{activeSession.ListingPrice?.toLocaleString('en-IN')}
+                        </span>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {/* Mark as Sold button if user is seller and item active */}
+                  {isSeller && activeItem && activeItem.Status !== 'SOLD' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowSoldConfirm(true)}
+                      className="rounded-xl bg-[#F2994A] px-3 py-1.5 text-xs font-semibold text-[#10131A] hover:bg-[#D97B2B] transition-colors cursor-pointer"
+                    >
+                      Mark Sold
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Status Banner (if Sold or Deal Handshake) */}
+              {isSold && (
+                <div
+                  className={`px-4 py-2 text-center text-xs font-semibold flex items-center justify-center gap-2 border-b ${
+                    isWinningBuyer || isSeller
+                      ? 'bg-[#1AA260]/10 border-[#1AA260]/20 text-[#1AA260]'
+                      : 'bg-zinc-100 dark:bg-zinc-800 border-borderline text-ink-muted'
+                  }`}
+                >
+                  <Lock className="h-3.5 w-3.5" />
+                  {isWinningBuyer
+                    ? '🎉 Congratulations! You purchased this campus item. Complete the peer rating below!'
+                    : isSeller
+                    ? '✓ Deal closed! You marked this item as sold.'
+                    : 'This item was marked as sold to another campus student.'}
+                </div>
+              )}
+
+              {/* Message History Feed */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-surface-base/30">
+                {/* Handshake greeting pill */}
+                <div className="text-center py-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-borderline bg-surface/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-ink-muted backdrop-blur-md">
+                    <ShieldCheck className="h-3 w-3 text-[#2F6FED]" />
+                    End-to-End Verified Campus Handshake
+                  </span>
+                </div>
+
+                {loadingMessagesFor === activeSession?.Session_ID && messages.length === 0 ? (
+                  <div className="space-y-4 py-5" aria-label="Loading chat messages">
+                    <div className="skeleton-shimmer h-12 w-2/3 rounded-2xl" />
+                    <div className="skeleton-shimmer ml-auto h-12 w-3/5 rounded-2xl" />
+                    <div className="skeleton-shimmer h-16 w-3/4 rounded-2xl" />
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="py-12 text-center text-ink-muted">
+                    <p className="text-xs font-medium">No messages yet.</p>
+                    <p className="text-[11px] text-ink-muted/70 mt-1">
+                      Say hello to {otherUserName} to arrange meetup locations or ask questions!
+                    </p>
+                  </div>
+                ) : (
+                  messages.map((message) => {
+                    const isMe = message.Sender_ID === user?.User_ID;
+                    const timeFormatted = message.Timestamp
+                      ? new Date(message.Timestamp).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : '';
+
+                    return (
+                      <motion.div
+                        key={message.Message_ID}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
+                      >
+                        <div
+                          className={`max-w-[82%] sm:max-w-[70%] rounded-2xl px-4 py-2.5 shadow-xs ${
+                            isMe
+                              ? 'bg-[#2F6FED] text-white rounded-br-xs'
+                              : 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100 rounded-bl-xs border border-borderline'
+                          }`}
+                        >
+                          {/* Optional media attachment */}
+                          {message.MediaUrl && (
+                            <div className="mb-2 overflow-hidden rounded-xl">
+                              {message.MediaType === 'video' ? (
+                                <video
+                                  src={message.MediaUrl}
+                                  controls
+                                  className="max-h-56 w-full rounded-xl object-cover"
+                                />
+                              ) : (
+                                <img
+                                  src={message.MediaUrl}
+                                  alt="Attachment"
+                                  onClick={() => setLightboxUrl(message.MediaUrl || null)}
+                                  className="max-h-56 w-full rounded-xl object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                                />
+                              )}
+                            </div>
+                          )}
+
+                          <p className="text-xs sm:text-sm leading-relaxed whitespace-pre-wrap break-words">
+                            {message.Text}
+                          </p>
+                        </div>
+
+                        <span className="text-[9px] text-ink-muted/60 mt-1 px-1">
+                          {timeFormatted}
+                        </span>
+                      </motion.div>
+                    );
+                  })
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Peer Rating Prompt (if sold and buyer hasn't rated) */}
+              {isWinningBuyer && !alreadyRated && !ratingSubmitted && (
+                <div className="border-t border-borderline bg-surface p-4">
+                  <form onSubmit={handleRateSubmit} className="space-y-3">
+                    {ratingError && <p role="alert" className="text-xs text-status-danger">{ratingError}</p>}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-ink">
+                        Rate your peer hand-off with {otherUserName}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setRatingScore(star)}
+                            className="text-amber-400 hover:scale-110 transition-transform"
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={ratingComment}
+                        onChange={(e) => setRatingComment(e.target.value)}
+                        placeholder="Leave feedback on item condition and punctuality..."
+                        className="flex-1 rounded-full border border-borderline bg-surface-base px-3.5 py-1.5 text-xs text-ink outline-none"
+                      />
+                      <button
+                        type="submit"
+                        className="rounded-full bg-[#1AA260] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#15824d]"
+                      >
+                        Submit
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* Message Composer Input Bar (Apple iMessage Pill Design) */}
+              <div className="border-t border-borderline p-3 sm:p-4 bg-surface/90 backdrop-blur-md">
+                {/* Media preview tag if selected */}
+                {pendingMedia && (
+                  <div className="mb-2 flex items-center justify-between rounded-xl border border-borderline bg-surface-base p-2">
+                    <span className="text-xs text-ink truncate max-w-xs">
+                      📎 {pendingMedia.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleRemovePendingMedia}
+                      className="text-ink-muted hover:text-ink"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {messageError && (
+                  <p role="alert" className="mb-2 text-xs text-status-danger">
+                    {messageError}
+                  </p>
+                )}
+
+                <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*,video/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+
+                  {/* Attachment button */}
+                  <button
+                    type="button"
+                    disabled={isLostBuyer}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-borderline bg-surface-base text-ink-muted hover:text-[#2F6FED] hover:border-[#2F6FED] transition-colors disabled:opacity-40"
+                    title="Attach photo"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                  </button>
+
+                  <input
+                    type="text"
+                    disabled={isLostBuyer}
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    placeholder={
+                      isLostBuyer
+                        ? 'Listing is closed'
+                        : `Message ${otherUserName}...`
+                    }
+                    className="flex-1 rounded-full border border-borderline bg-surface-base px-4 py-2.5 text-xs sm:text-sm text-ink placeholder-ink-muted/50 outline-none transition focus:border-[#2F6FED] disabled:opacity-50"
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={(!inputMessage.trim() && !pendingMedia) || isLostBuyer || isSendingMessage}
+                    className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#2F6FED] text-white transition-transform active:scale-95 hover:bg-[#1B4FC4] disabled:opacity-30 cursor-pointer shadow-xs"
+                    title={isSendingMessage ? 'Sending message' : 'Send message'}
+                  >
+                    <Send className="h-4 w-4" />
+                  </button>
+                </form>
+              </div>
+            </>
+          ) : (
+            /* Empty State when no conversation selected */
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center text-ink-muted">
+              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-[#2F6FED]/10 text-[#2F6FED] mb-4">
+                <MessageSquare className="h-8 w-8" />
+              </div>
+              <h2 className="font-display text-lg font-bold text-ink">
+                Select a Conversation
+              </h2>
+              <p className="mt-1 text-xs text-ink-muted max-w-sm font-body">
+                Choose a conversation from the sidebar to chat with students, confirm meetups, or negotiate prices.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
       {/* CONFIRMATION MODAL: Mark as Sold to THIS buyer */}
       <AnimatePresence>
-        {showSoldConfirm && (
+        {showSoldConfirm && activeItem && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
               variants={MODAL_BACKDROP_VARIANTS}
@@ -557,13 +729,13 @@ export default function ChatPage() {
               initial="initial"
               animate="animate"
               exit="exit"
-              className="relative z-10 w-full max-w-md rounded-2xl border border-borderline bg-surface p-6 shadow-xl"
+              className="relative z-10 w-full max-w-md rounded-3xl border border-borderline bg-surface p-6 shadow-2xl"
             >
               <h3 className="font-display text-xl font-bold text-ink">
-                Sell "{item.Title}" to {otherUser?.Name}?
+                Sell "{activeItem.Title}" to {otherUserName}?
               </h3>
               <p className="mt-2 text-xs text-ink-muted leading-relaxed font-body">
-                This will close the listing, mark {otherUser?.Name} as the winning buyer, update the item to SOLD everywhere, and open the peer review prompt.
+                This will close the listing, mark {otherUserName} as the winning buyer, update the status to SOLD across the bazaar, and open peer ratings.
               </p>
 
               <div className="mt-6 flex items-center justify-end gap-3">
@@ -587,7 +759,7 @@ export default function ChatPage() {
         )}
       </AnimatePresence>
 
-      {/* DEAL CLOSED STAMP ANIMATION */}
+      {/* DEAL CLOSED CELEBRATION STAMP */}
       <AnimatePresence>
         {dealClosedStamp && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
@@ -596,14 +768,14 @@ export default function ChatPage() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 1.1, opacity: 0 }}
               transition={POP_SPRING}
-              className="flex flex-col items-center gap-3 rounded-2xl border-2 border-[#1AA260] bg-surface/95 p-8 text-center text-ink shadow-2xl backdrop-blur-xl"
+              className="flex flex-col items-center gap-3 rounded-3xl border-2 border-[#1AA260] bg-surface/95 p-8 text-center text-ink shadow-2xl backdrop-blur-xl"
             >
               <Sparkles className="h-10 w-10 text-[#1AA260] animate-pulse" />
               <div className="rounded-full bg-[#1AA260] px-4 py-1 text-xs font-bold uppercase tracking-widest text-white">
                 Deal Closed!
               </div>
               <p className="text-xs text-ink-muted">
-                Sold to {otherUser?.Name}. Peer rating prompt is now active!
+                Item marked sold to {otherUserName}.
               </p>
             </motion.div>
           </div>

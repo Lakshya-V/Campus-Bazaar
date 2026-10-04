@@ -5,12 +5,12 @@ import { SlidersHorizontal } from 'lucide-react';
 
 interface BudgetRangeSliderProps {
   maxPrice?: number;
-  value: number; // current max budget filter (0 - 500, 500 = All)
+  value: number; // current max budget filter (0 - 10,000, 10,000 = All)
   onChange: (value: number) => void;
 }
 
-const MAX_LIMIT = 500;
-const STEP = 10;
+const MAX_LIMIT = 10000;
+const STEP = 100;
 
 export default function BudgetRangeSlider({
   value,
@@ -68,7 +68,7 @@ export default function BudgetRangeSlider({
       ? 'All Prices'
       : activeValue <= 0
       ? 'Free items only'
-      : `Up to $${activeValue}`;
+      : `Up to ₹${activeValue.toLocaleString('en-IN')}`;
 
   return (
     <div className="flex items-center gap-3 text-xs">
@@ -117,7 +117,7 @@ export default function BudgetRangeSlider({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#10131A] px-2 py-0.5 text-[10px] font-bold text-white shadow-lg border border-white/10"
               >
-                ${activeValue}
+                ₹{activeValue.toLocaleString('en-IN')}{activeValue >= MAX_LIMIT ? '+' : ''}
               </motion.div>
             )}
           </motion.div>

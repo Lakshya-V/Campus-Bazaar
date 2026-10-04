@@ -14,9 +14,11 @@ interface FeaturedSpotlightCarouselProps {
 }
 
 const CONDITION_BADGES: Record<string, { bg: string; text: string }> = {
-  new: { bg: 'bg-[#1AA260]', text: 'text-white' },
+  'brand new': { bg: 'bg-[#1AA260]', text: 'text-white' },
+  'like new': { bg: 'bg-[#2F6FED]', text: 'text-white' },
   good: { bg: 'bg-[#2F6FED]', text: 'text-white' },
-  fair: { bg: 'bg-[#E0912B]', text: 'text-white' },
+  'fair use': { bg: 'bg-[#E0912B]', text: 'text-white' },
+  'books & notes': { bg: 'bg-[#7C5CE7]', text: 'text-white' },
 };
 
 function SpotlightCard({
@@ -71,7 +73,7 @@ function SpotlightCard({
                 {seller.IsVerified && (
                   <ShieldCheck className="h-3.5 w-3.5 text-[#2F6FED]" />
                 )}
-                <RatingStars value={seller.Rating} size={11} showScore />
+                <RatingStars value={seller.Rating} count={seller.RatingCount} size={11} showScore />
               </div>
             )}
           </div>
@@ -89,7 +91,7 @@ function SpotlightCard({
         <div className="flex items-center justify-between pt-2 border-t border-borderline mt-auto">
           <div className="flex items-baseline gap-1.5">
             <span className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-ink">
-              ${item.Price}
+              ₹{item.Price.toLocaleString('en-IN')}
             </span>
             <span className="text-[10px] uppercase tracking-wider text-ink-muted">
               peer price

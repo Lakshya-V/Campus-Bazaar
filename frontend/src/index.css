@@ -346,6 +346,23 @@ body {
   transform: scale(0.98);
 }
 
+.skeleton-shimmer {
+  background: linear-gradient(
+    100deg,
+    rgb(var(--surface-elevated)) 25%,
+    rgba(var(--ink-muted), 0.14) 45%,
+    rgb(var(--surface-elevated)) 65%
+  );
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  to {
+    background-position-x: -220%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

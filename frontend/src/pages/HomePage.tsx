@@ -16,8 +16,10 @@ import {
 } from 'lucide-react';
 import { useMarket } from '../context/MarketContext';
 import ListingCard from '../components/listings/ListingCard';
+import ListingCardSkeleton from '../components/listings/ListingCardSkeleton';
 import FeaturedSpotlightCarousel from '../components/home/FeaturedSpotlightCarousel';
 import BudgetRangeSlider from '../components/home/BudgetRangeSlider';
+import SelectMenu from '../components/common/SelectMenu';
 import MarketplaceFooter from '../components/layout/MarketplaceFooter';
 import { CATEGORY_METAS, getCategorySlug } from '../data/mockMarketData';
 import { PAGE_VARIANTS } from '../lib/motion';
@@ -34,31 +36,43 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { items, categories, fetchListings } = useMarket();
+  const { items, categories, fetchListings, isLoadingMarket } = useMarket();
   const [searchParams, setSearchParams] = useSearchParams();
   const conditionFilter = searchParams.get('condition') || '';
+  const searchQuery = searchParams.get('q') || '';
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, []);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
     void fetchListings({
-      search: searchParams.get('q') || undefined,
+      search: debouncedSearch || undefined,
       condition: conditionFilter || undefined,
     });
-  }, [conditionFilter, fetchListings, searchParams]);
+  }, [conditionFilter, debouncedSearch, fetchListings]);
 
-  const searchQuery = searchParams.get('q') || '';
   const [sortBy, setSortBy] = useState<SortOption>('newest');
-  // Interactive budget limit: 500 = All Prices (no upper cap)
-  const [maxBudget, setMaxBudget] = useState<number>(500);
+  // Interactive budget limit: 10,000 = ₹10,000+
+  const [maxBudget, setMaxBudget] = useState<number>(10000);
+  const [settledBudget, setSettledBudget] = useState<number>(10000);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettledBudget(maxBudget), 300);
+    return () => window.clearTimeout(timer);
+  }, [maxBudget]);
 
   // Filter & sort items across all categories
   const filteredItems = useMemo(() => {
     return items
       .filter((item) => item.Status === 'AVAILABLE')
-      .filter((item) => !conditionFilter || item.Condition === conditionFilter)
+      .filter((item) => !conditionFilter || item.Condition.toLowerCase() === conditionFilter.toLowerCase())
       .filter((item) => {
         if (!searchQuery.trim()) return true;
         const q = searchQuery.toLowerCase();
@@ -69,8 +83,8 @@ export default function HomePage() {
         );
       })
       .filter((item) => {
-        if (maxBudget < 500) {
-          return item.Price <= maxBudget;
+        if (settledBudget < 10000) {
+          return item.Price <= settledBudget;
         }
         return true;
       })
@@ -80,7 +94,7 @@ export default function HomePage() {
         if (sortBy === 'views') return b.ViewCount - a.ViewCount;
         return new Date(b.PostedAt).getTime() - new Date(a.PostedAt).getTime();
       });
-  }, [items, searchQuery, conditionFilter, maxBudget, sortBy]);
+  }, [items, searchQuery, conditionFilter, settledBudget, sortBy]);
 
   // Group filtered items by category, capped at 4 items per category row
   const categorySections = useMemo(() => {
@@ -110,7 +124,7 @@ export default function HomePage() {
         return {
           meta,
           totalAvailable: allAvailableInCat.length,
-          items: matchingFiltered.slice(0, 4), // Capped preview row: max 4 items
+          items: matchingFiltered,
           hasMatches: matchingFiltered.length > 0,
         };
       });
@@ -128,12 +142,12 @@ export default function HomePage() {
   }
 
   function handleClearFilters() {
-    setMaxBudget(500);
+    setMaxBudget(10000);
     setSortBy('newest');
     setSearchParams({}, { replace: true });
   }
 
-  const hasActiveFilters = searchQuery.trim() !== '' || maxBudget < 500;
+  const hasActiveFilters = searchQuery.trim() !== '' || maxBudget < 10000;
   const hasAnyMatches = categorySections.some((sec) => sec.hasMatches);
 
   return (
@@ -223,22 +237,25 @@ export default function HomePage() {
             value={maxBudget}
             onChange={(val) => setMaxBudget(val)}
           />
-          <select
+          <SelectMenu
             value={conditionFilter}
-            onChange={(event) => {
+            onChange={(value) => {
               const next = new URLSearchParams(searchParams);
-              if (event.target.value) next.set('condition', event.target.value);
+              if (value) next.set('condition', value);
               else next.delete('condition');
               setSearchParams(next, { replace: true });
             }}
             className="rounded-full border border-borderline bg-surface-base px-3 py-2 text-xs text-ink outline-none"
             aria-label="Filter by condition"
-          >
-            <option value="">All conditions</option>
-            <option value="new">New</option>
-            <option value="good">Good</option>
-            <option value="fair">Fair</option>
-          </select>
+            options={[
+              { value: '', label: 'All conditions' },
+              { value: 'Brand New', label: 'Brand New' },
+              { value: 'Like New', label: 'Like New' },
+              { value: 'good', label: 'Good' },
+              { value: 'Fair Use', label: 'Fair Use' },
+              { value: 'books & notes', label: 'Books & Notes' },
+            ]}
+          />
 
           {/* Right: Sticky Sort Segmented Control */}
           <div className="flex items-center gap-1.5 text-xs">
@@ -281,7 +298,7 @@ export default function HomePage() {
       {/* ═══════════════════════════════════════════════════════════════
           4. CAPPED PREVIEW ROWS PER CATEGORY (Replaces single long grid)
           ═══════════════════════════════════════════════════════════════ */}
-      <div className="space-y-12">
+      <div className="min-h-screen space-y-12 pb-16">
         {categorySections.map(({ meta, totalAvailable, items: catItems, hasMatches }) => {
           if (!hasMatches) return null;
           const Icon = CATEGORY_ICONS[meta.slug] || Layers;
@@ -316,8 +333,7 @@ export default function HomePage() {
                 </button>
               </div>
 
-              {/* Capped 4-Item Preview Grid */}
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 {catItems.map((item) => (
                   <div key={item.Item_ID} className="h-full">
                     <ListingCard item={item} />
@@ -331,7 +347,11 @@ export default function HomePage() {
 
       {/* Empty Filter State (if no categories match criteria) */}
       {!hasAnyMatches && (
-        <div className="rounded-3xl border border-dashed border-borderline bg-black/[0.01] py-16 text-center dark:bg-white/[0.01]">
+        isLoadingMarket && items.length === 0 ? (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }, (_, index) => <ListingCardSkeleton key={index} />)}
+          </div>
+        ) : <div className="rounded-3xl border border-dashed border-borderline bg-black/[0.01] py-16 text-center dark:bg-white/[0.01]">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2F6FED]/10 text-[#2F6FED] dark:text-[#4F8CFF]">
             <SlidersHorizontal className="h-6 w-6" />
           </div>

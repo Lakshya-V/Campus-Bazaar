@@ -191,7 +191,7 @@ export default function SearchAutocomplete({
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-display font-bold tabular-nums text-sell">
-                        ${sug.item.Price}
+                        ₹{sug.item.Price.toLocaleString('en-IN')}
                       </span>
                       <ArrowRight className="h-3 w-3 opacity-60" />
                     </div>

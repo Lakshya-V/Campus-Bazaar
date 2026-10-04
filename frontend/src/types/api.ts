@@ -1,8 +1,3 @@
-// src/types/api.ts
-//
-// Shared TypeScript interfaces for the Campus Bazaar API, matching the
-// endpoints documented in the Campus Bazaar Blueprint (v2).
-
 /** Generic DRF-style paginated list response. */
 export interface PaginatedResponse<T> {
   count: number;
@@ -11,7 +6,17 @@ export interface PaginatedResponse<T> {
   results: T[];
 }
 
-export type ListingCondition = 'new' | 'good' | 'fair';
+export type ListingCondition = 'Brand New' | 'Like New' | 'Good' | 'Fair Use' | 'Books & Notes';
+export type ListingStatus = 'AVAILABLE' | 'SOLD';
+
+export interface User {
+  id: number;
+  username: string;
+  university_email: string;
+  hostel_building: string;
+  phone_number: string;
+  is_verified_student: boolean;
+}
 
 export interface Category {
   id: number;
@@ -19,99 +24,103 @@ export interface Category {
   slug: string;
 }
 
-export interface ListingImage {
-  id: number;
-  url: string;
-  order: number;
-}
-
-export interface User {
-  id: number;
-  username: string;
-  email: string;
-  first_name?: string;
-  last_name?: string;
-  avatar_url?: string | null;
-  date_joined?: string;
-}
-
-/** Minimal seller/owner info as embedded in a Listing response. */
-export interface ListingOwner {
-  id: number;
-  username: string;
-  avatar_url?: string | null;
-}
-
+/** GET /api/listings/ response. */
 export interface Listing {
   id: number;
+  seller: User;
+  seller_id: number;
+  category: Category;
   title: string;
   description: string;
-  /**
-   * DRF DecimalField serializes as a string by default.
-   * Convert with Number(listing.price) before doing arithmetic.
-   */
   price: string;
   condition: ListingCondition;
-  category: Category;
-  images: ListingImage[];
-  owner: ListingOwner;
+  status: ListingStatus;
+  image_url: string;
   is_favorited: boolean;
   created_at: string;
-  updated_at: string;
 }
 
-/** Payload for POST/PUT /api/listings/. */
+/** POST /api/listings/ request. */
 export interface ListingInput {
   title: string;
   description: string;
   price: number;
   condition: ListingCondition;
-  category: number; // category id
+  category_id: number;
+  image?: File;
+}
+
+export interface ConversationListing {
+  id: number;
+  title: string;
+  price: string;
+  condition: ListingCondition;
+  status: ListingStatus;
+  image_url: string;
+  category: string;
+  category_id: number;
+  seller_id: number;
+}
+
+export interface LastMessage {
+  id: number;
+  sender_id: number;
+  sender_name: string;
+  text: string;
+  image_url?: string;
+  media_type?: 'image' | 'video' | '';
+  timestamp: string;
+}
+
+/** GET/POST /api/conversations/ response. */
+export interface Conversation {
+  id: number;
+  listing: ConversationListing;
+  listing_id: number;
+  buyer: User;
+  buyer_id: number;
+  seller: User;
+  seller_id: number;
+  last_message: LastMessage | null;
+  created_at: string;
+}
+
+/** POST /api/conversations/ request. */
+export interface ConversationInput {
+  listing_id: number;
+}
+
+export interface Message {
+  id: number;
+  conversation: number;
+  conversation_id: number;
+  sender: User;
+  sender_id: number;
+  text: string;
+  timestamp: string;
+}
+
+/** GET/POST /api/messages/ request. */
+export interface MessageInput {
+  conversation: number;
+  text: string;
 }
 
 export interface Favorite {
   id: number;
   listing: Listing;
-  created_at: string;
 }
 
-export interface Conversation {
-  id: number;
-  listing: Pick<Listing, 'id' | 'title' | 'images'>;
-  participants: User[];
-  last_message: Message | null;
-  unread_count: number;
-  created_at: string;
-  updated_at: string;
+export interface FavoriteToggleResponse {
+  favorited: boolean;
+  listing_id: number;
 }
 
-export interface Message {
-  id: number;
-  conversation: number; // conversation id
-  sender: User;
-  content: string;
-  is_read: boolean;
-  created_at: string;
-}
-
-/** Payload for POST /api/messages/. */
-export interface MessageInput {
-  conversation: number;
-  content: string;
-}
-
-/** GET /api/conversations/unread-count/ */
-export interface UnreadCountResponse {
-  unread_count: number;
-}
-
-/** POST /api/auth/login/ response shape. */
 export interface LoginResponse {
   access: string;
-  user: User;
+  refresh: string;
 }
 
-/** POST /api/auth/refresh/ response shape. */
 export interface RefreshResponse {
   access: string;
 }

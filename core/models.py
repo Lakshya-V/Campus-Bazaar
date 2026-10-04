@@ -1,11 +1,11 @@
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Avg
 
 def validate_campus_email(value):
-    allowed_domains = ['vitstudent.ac.in']
-    domain = value.split('@')[-1]
-    if not any(domain.endswith(d) for d in allowed_domains):
+    domain = value.rsplit('@', 1)[-1].lower()
+    if domain != 'vitstudent.ac.in':
         raise ValidationError(f"Email domain '{domain}' is not authorized. Must be a valid campus email.")
 
 class CustomUser(AbstractUser):
@@ -14,6 +14,16 @@ class CustomUser(AbstractUser):
     graduation_year = models.IntegerField(null=True, blank=True)
     phone_number = models.CharField(max_length=15, blank=True)
     is_verified_student = models.BooleanField(default=False)
+    otp_code = models.CharField(max_length=6, blank=True, null=True)
+    otp_created_at = models.DateTimeField(blank=True, null=True)
+
+    @property
+    def rating_average(self):
+        return self.received_reviews.aggregate(average=Avg('score'))['average'] or 0
+
+    @property
+    def rating_count(self):
+        return self.received_reviews.count()
 
     def __str__(self):
         return f"{self.username} ({self.university_email})"
@@ -32,18 +42,18 @@ class Category(models.Model):
 
 class Listing(models.Model):
     class Condition(models.TextChoices):
-        NEW = 'New', 'New'
+        NEW = 'Brand New', 'Brand New'
         LIKE_NEW = 'Like New', 'Like New'
         GOOD = 'Good', 'Good'
-        FAIR = 'Fair', 'Fair'
+        FAIR = 'Fair Use', 'Fair Use'
+        BOOKS_NOTES = 'Books & Notes', 'Books & Notes'
 
     class Status(models.TextChoices):
         AVAILABLE = 'AVAILABLE', 'Available'
-        RESERVED = 'RESERVED', 'Reserved'
         SOLD = 'SOLD', 'Sold'
 
     seller = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='listings')
-    category = models.ForeignKey(Category, null=True, blank=True, on_delete=models.SET_NULL, related_name='listings')
+    category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name='listings')
     title = models.CharField(max_length=150)
     description = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -76,9 +86,15 @@ class Conversation(models.Model):
 
 
 class Message(models.Model):
+    class MediaType(models.TextChoices):
+        IMAGE = 'image', 'Image'
+        VIDEO = 'video', 'Video'
+
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
     sender = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='sent_messages')
     text = models.TextField()
+    image_url = models.URLField(blank=True)
+    media_type = models.CharField(max_length=5, choices=MediaType.choices, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -99,3 +115,58 @@ class Favorite(models.Model):
 
     def __str__(self):
         return f'{self.user} favorited {self.listing}'
+
+
+class Rating(models.Model):
+    conversation = models.ForeignKey(
+        Conversation, on_delete=models.CASCADE, related_name='ratings'
+    )
+    rater = models.ForeignKey(
+        CustomUser, on_delete=models.CASCADE, related_name='given_reviews'
+    )
+    rated_user = models.ForeignKey(
+        CustomUser, on_delete=models.CASCADE, related_name='received_reviews'
+    )
+    score = models.PositiveSmallIntegerField()
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['conversation', 'rater'],
+                name='unique_conversation_rater_review',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(score__gte=1, score__lte=5),
+                name='rating_score_between_one_and_five',
+            ),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.rater} rated {self.rated_user}: {self.score}/5'
+
+
+class Notification(models.Model):
+    recipient = models.ForeignKey(
+        CustomUser, on_delete=models.CASCADE, related_name='notifications'
+    )
+    sender = models.ForeignKey(
+        CustomUser, on_delete=models.CASCADE, related_name='sent_notifications'
+    )
+    conversation = models.ForeignKey(
+        Conversation, on_delete=models.CASCADE, related_name='notifications'
+    )
+    message = models.ForeignKey(
+        Message, on_delete=models.CASCADE, related_name='notifications',
+        null=True, blank=True,
+    )
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Notification for {self.recipient} from {self.sender}'

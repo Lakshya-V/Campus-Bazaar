@@ -2,7 +2,15 @@
 //
 // Peer-to-peer campus marketplace data model matching the prompt specification.
 
-export type ListingCondition = 'new' | 'good' | 'fair';
+export type ListingCondition =
+  | 'Brand New'
+  | 'Like New'
+  | 'Good'
+  | 'Fair Use'
+  | 'Books & Notes'
+  | 'new'
+  | 'good'
+  | 'fair';
 export type ItemStatus = 'AVAILABLE' | 'SOLD';
 
 export interface User {
@@ -14,13 +22,17 @@ export interface User {
   Rating: number; // average rating (e.g. 4.9)
   RatingCount: number;
   IsVerified: boolean;
+  HostelBuilding?: string;
+  PhoneNumber?: string;
 }
 
 export interface Item {
   Item_ID: string;
   Seller_ID: string;
+  SellerName?: string;
   Title: string;
   Category: string; // matches Category.Name
+  CategoryId?: number;
   Price: number;
   Condition: ListingCondition;
   Status: ItemStatus;
@@ -29,11 +41,13 @@ export interface Item {
   PostedAt: string;
   ViewCount: number;
   WinningBuyer_ID?: string;
+  IsFavorited?: boolean;
 }
 
 export interface Category {
   Category_ID: string;
   Name: string;
+  Slug?: string;
 }
 
 export interface ChatSession {
@@ -43,12 +57,20 @@ export interface ChatSession {
   Seller_ID: string;
   CreatedAt: string;
   SoldToBuyer?: boolean;
+  ListingTitle?: string;
+  ListingPrice?: number;
+  ListingImage?: string;
+  BuyerName?: string;
+  SellerName?: string;
+  LastMessageText?: string;
+  LastMessageTime?: string;
 }
 
 export interface Message {
   Message_ID: string;
   Session_ID: string;
   Sender_ID: string;
+  SenderName?: string;
   Text: string;
   Timestamp: string;
   MediaType?: 'text' | 'image' | 'video';

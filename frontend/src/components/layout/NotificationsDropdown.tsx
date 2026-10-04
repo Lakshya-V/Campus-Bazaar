@@ -1,16 +1,22 @@
 // src/components/layout/NotificationsDropdown.tsx
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, MessageSquare, ArrowRight } from 'lucide-react';
 import { useMarket } from '../../context/MarketContext';
 import { POP_SPRING } from '../../lib/motion';
 
 export default function NotificationsDropdown() {
-  const { notifications, unreadNotificationCount } = useMarket();
+  const { notifications } = useMarket();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const activeSessionId = location.pathname.match(/^\/chat\/([^/]+)/)?.[1];
+  const visibleNotifications = notifications.filter(
+    (notification) => notification.unread && notification.sessionId !== activeSessionId
+  );
+  const visibleUnreadCount = visibleNotifications.filter((notification) => notification.unread).length;
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -36,14 +42,14 @@ export default function NotificationsDropdown() {
         className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-borderline bg-surface/60 text-ink transition-colors hover:border-[#2F6FED]/40 hover:bg-surface"
       >
         <Bell className="h-4 w-4" />
-        {unreadNotificationCount > 0 && (
+        {visibleUnreadCount > 0 && (
           <motion.span
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={POP_SPRING}
             className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#2F6FED] px-1 text-[10px] font-bold text-white shadow-md"
           >
-            {unreadNotificationCount}
+            {visibleUnreadCount}
           </motion.span>
         )}
       </button>
@@ -64,20 +70,20 @@ export default function NotificationsDropdown() {
                   Recent Messages
                 </h3>
               </div>
-              {unreadNotificationCount > 0 && (
+              {visibleUnreadCount > 0 && (
                 <span className="rounded-full bg-[#2F6FED]/10 px-2 py-0.5 text-[11px] font-medium text-[#2F6FED] dark:bg-[#4F8CFF]/15 dark:text-[#4F8CFF]">
-                  {unreadNotificationCount} new
+                  {visibleUnreadCount} new
                 </span>
               )}
             </div>
 
             <div className="max-h-80 overflow-y-auto divide-y divide-borderline">
-              {notifications.length === 0 ? (
+              {visibleNotifications.length === 0 ? (
                 <div className="p-6 text-center text-xs text-ink-muted">
                   No active message threads yet.
                 </div>
               ) : (
-                notifications.slice(0, 5).map((n) => (
+                visibleNotifications.slice(0, 5).map((n) => (
                   <button
                     key={n.id}
                     type="button"
@@ -122,8 +128,8 @@ export default function NotificationsDropdown() {
                 type="button"
                 onClick={() => {
                   setIsOpen(false);
-                  if (notifications.length > 0) {
-                    navigate(`/chat/${notifications[0].sessionId}`);
+                  if (visibleNotifications.length > 0) {
+                    navigate(`/chat/${visibleNotifications[0].sessionId}`);
                   }
                 }}
                 className="inline-flex items-center gap-1.5 text-xs font-medium text-[#2F6FED] hover:underline dark:text-[#4F8CFF]"

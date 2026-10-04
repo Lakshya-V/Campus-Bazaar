@@ -36,7 +36,7 @@ export default function ProfilePage() {
     messages,
     wishlist,
     getUser,
-    markItemSold,
+    toggleItemStatus,
     addRating,
     ratings,
   } = useMarket();
@@ -94,9 +94,19 @@ export default function ProfilePage() {
     });
   }
 
-  function handleRateCounterparty(counterpartyId: string, itemId: string, score: number) {
-    addRating('', counterpartyId, score, 'Smooth peer hand-off');
-    setRatedSuccess((prev) => ({ ...prev, [itemId]: true }));
+  async function handleRateCounterparty(counterpartyId: string, itemId: string, score: number) {
+    const session = chatSessions.find(
+      (candidate) =>
+        candidate.Item_ID === itemId &&
+        (candidate.Buyer_ID === counterpartyId || candidate.Seller_ID === counterpartyId)
+    );
+    if (!session) return;
+    try {
+      await addRating(session.Session_ID, counterpartyId, score, 'Smooth peer hand-off');
+      setRatedSuccess((prev) => ({ ...prev, [itemId]: true }));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not submit rating.');
+    }
   }
 
   return (
@@ -141,13 +151,16 @@ export default function ProfilePage() {
                 <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-ink">
                   {user.Name}
                 </h1>
-                <span className="rounded-full bg-[#2F6FED]/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#2F6FED] dark:text-[#4F8CFF]">
-                  Verified Student
-                </span>
+                {user.IsVerified && (
+                  <span className="rounded-full bg-[#2F6FED]/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#2F6FED] dark:text-[#4F8CFF]">
+                    Verified Student
+                  </span>
+                )}
               </div>
               <p className="mt-0.5 text-xs text-ink-muted font-body">
                 {user.InstitutionalEmail}
               </p>
+              {user.HostelBuilding && <p className="mt-1 text-xs text-ink-muted">{user.HostelBuilding}</p>}
               <div className="mt-2 flex items-center gap-2">
                 <RatingStars value={user.Rating} size={15} showScore count={user.RatingCount} />
               </div>
@@ -376,7 +389,7 @@ export default function ProfilePage() {
                           </h3>
                           <div className="mt-1.5 flex items-center justify-between">
                             <span className="font-display text-lg font-bold text-ink">
-                              ${item.Price}
+                              ₹{item.Price.toLocaleString('en-IN')}
                             </span>
                             <span className="rounded-full border border-borderline px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
                               {item.Category}
@@ -395,15 +408,15 @@ export default function ProfilePage() {
                             <ExternalLink className="h-3 w-3" />
                           </button>
 
-                          {!isSold && (
-                            <button
-                              type="button"
-                              onClick={() => markItemSold(item.Item_ID)}
-                              className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-[#F2994A] py-2 text-xs font-semibold text-[#10131A] transition-colors hover:bg-[#D97B2B]"
-                            >
-                              <span>Mark Sold</span>
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => void toggleItemStatus(item.Item_ID).catch((error) =>
+                              window.alert(error instanceof Error ? error.message : 'Could not update listing status.')
+                            )}
+                            className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-[#F2994A] py-2 text-xs font-semibold text-[#10131A] transition-colors hover:bg-[#D97B2B]"
+                          >
+                            <span>Mark {isSold ? 'Available' : 'Sold'}</span>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -506,7 +519,7 @@ export default function ProfilePage() {
                                 {item.Title}
                               </span>
                               <span className="block font-display text-[11px] font-bold text-ink">
-                                ${item.Price}
+                                ₹{item.Price.toLocaleString('en-IN')}
                               </span>
                             </div>
                           </div>
@@ -640,7 +653,7 @@ export default function ProfilePage() {
                               {item.Title}
                             </h4>
                             <span className="font-display text-base font-bold text-ink">
-                              ${item.Price}
+                              ₹{item.Price.toLocaleString('en-IN')}
                             </span>
                           </div>
                         </div>

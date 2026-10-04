@@ -76,6 +76,10 @@ export default function AppRoutes() {
 
           {/* Chat System Route */}
           <Route
+            path="/chat"
+            element={isAuthenticated ? <ChatPage /> : <Navigate to="/" replace />}
+          />
+          <Route
             path="/chat/:sessionId"
             element={isAuthenticated ? <ChatPage /> : <Navigate to="/" replace />}
           />

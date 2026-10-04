@@ -6,16 +6,16 @@ import {
   Mail,
   User,
   ArrowRight,
-  UserCheck,
+  Check,
   ChevronDown,
   ShieldCheck,
   MapPin,
   Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { getApiErrorMessage } from '../api/axios';
 import Logo from '../components/Logo';
 import ThemeToggle from '../components/common/ThemeToggle';
-import RatingStars from '../components/common/RatingStars';
 import MarqueeStrip from '../components/common/MarqueeStrip';
 import InteractiveGridBackground from '../components/common/InteractiveGridBackground';
 
@@ -25,7 +25,7 @@ const MARQUEE_MESSAGES = [
   'Zero Platform Fees',
   'Campus Hand-off Only',
   'No Hidden Charges',
-  'Institutional .edu Authentication',
+  'VIT Student Email Verification',
   'Direct Peer Marketplace',
 ];
 
@@ -131,7 +131,7 @@ const TRUST_HIGHLIGHTS = [
     bgColor: 'bg-[#2F6FED]/10',
     title: 'Verified Institutional Emails',
     description:
-      'Only authenticated students with active .edu campus accounts can list or purchase. Zero outside spam or fake accounts.',
+      'Only students with an @vitstudent.ac.in address can list or purchase. Zero outside spam or fake accounts.',
   },
   {
     id: 'trust-handoff',
@@ -149,12 +149,12 @@ const TRUST_HIGHLIGHTS = [
     bgColor: 'bg-[#1AA260]/10',
     title: 'Zero Platform Fees',
     description:
-      '100% peer-to-peer commerce. Keep every dollar you make with zero listing fees, platform cuts, or hidden student deductions.',
+      '100% peer-to-peer commerce. Keep every rupee you make with zero listing fees, platform cuts, or hidden student deductions.',
   },
 ];
 
 export default function LoginPage() {
-  const { login, signup, demoUsers } = useAuth();
+  const { login, signup, sendVerificationCode, verifyEmail } = useAuth();
   const navigate = useNavigate();
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [fullName, setFullName] = useState('');
@@ -163,6 +163,10 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoggingInSuccess, setIsLoggingInSuccess] = useState(false);
+  const [isOtpOpen, setIsOtpOpen] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const loginSectionRef = useRef<HTMLDivElement>(null);
@@ -194,9 +198,9 @@ export default function LoginPage() {
     setError(null);
 
     const trimmed = email.trim();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@vitstudent\.ac\.in$/i;
     if (!emailRegex.test(trimmed)) {
-      setError('Please enter a valid campus or institutional email address (e.g., student@campus.edu).');
+      setError('Use your @vitstudent.ac.in student email address.');
       return;
     }
 
@@ -209,6 +213,19 @@ export default function LoginPage() {
     try {
       if (authMode === 'signup') {
         await signup(fullName.trim(), trimmed, password);
+        setIsLoggingInSuccess(true);
+        setIsOtpOpen(true);
+        setOtpError(null);
+        try {
+          await sendVerificationCode(trimmed);
+        } catch (otpSendError) {
+          setOtpError(getApiErrorMessage(
+            otpSendError,
+            'Your account was created, but the code could not be sent. Try resending it.'
+          ));
+        }
+        setIsSubmitting(false);
+        return;
       } else {
         await login(trimmed, password);
       }
@@ -217,26 +234,49 @@ export default function LoginPage() {
         navigate('/');
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
       }, 350);
-    } catch {
-      setError(authMode === 'signup' ? 'Registration failed. Please try again.' : 'Authentication failed. Please check your email.');
+    } catch (submitError) {
+      setError(getApiErrorMessage(
+        submitError,
+        authMode === 'signup'
+          ? 'Registration failed. Please try again.'
+          : 'Authentication failed. Please check your email.'
+      ));
       setIsSubmitting(false);
     }
   }
 
-  async function handleQuickLogin(demoEmail: string) {
-    setEmail(demoEmail);
-    setError(null);
-    setIsSubmitting(true);
+  async function handleOtpSubmit(event: FormEvent) {
+    event.preventDefault();
+    setOtpError(null);
+    if (!/^\d{6}$/.test(otpCode)) {
+      setOtpError('Enter the six-digit code from your email.');
+      return;
+    }
+    setIsVerifying(true);
     try {
-      await login(demoEmail, password);
+      await verifyEmail(email, otpCode, password);
+      setIsOtpOpen(false);
       setIsLoggingInSuccess(true);
       setTimeout(() => {
         navigate('/');
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
       }, 350);
-    } catch {
-      setError('Quick login failed.');
-      setIsSubmitting(false);
+    } catch (verificationError) {
+      setOtpError(getApiErrorMessage(
+        verificationError,
+        'Verification failed. Check the code and try again.'
+      ));
+    } finally {
+      setIsVerifying(false);
+    }
+  }
+
+  async function handleResendOtp() {
+    setOtpError(null);
+    try {
+      await sendVerificationCode(email);
+    } catch (resendError) {
+      setOtpError(getApiErrorMessage(resendError, 'Could not resend the code.'));
     }
   }
 
@@ -573,14 +613,15 @@ export default function LoginPage() {
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="your.name@campus.edu"
+                        placeholder="registration_number@vitstudent.ac.in"
+                        pattern="^[^\s@]+@vitstudent\.ac\.in$"
                         className="w-full rounded-full border border-borderline bg-surface-base py-3 pl-11 pr-5 text-sm text-ink placeholder-ink-muted/60 outline-none transition focus:border-[#2F6FED] focus:ring-1 focus:ring-[#2F6FED]"
                       />
                     </div>
                     <p className="mt-1.5 text-[11px] text-ink-muted">
                       {authMode === 'login'
-                        ? 'Instant access or automatic peer provisioning with student email.'
-                        : 'Must be an active student or institutional .edu email.'}
+                        ? 'Sign in with your verified VIT student email.'
+                        : 'A one-time code will be sent to your @vitstudent.ac.in inbox.'}
                     </p>
                   </div>
 
@@ -621,49 +662,6 @@ export default function LoginPage() {
                   </motion.button>
                 </form>
 
-                {/* Quick Demo Student Profiles with #F2A93B Rating Stars */}
-                <div className="mt-7 border-t border-borderline pt-5">
-                  <div className="flex items-center justify-between text-xs text-ink-muted mb-3">
-                    <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider">
-                      <UserCheck className="h-3.5 w-3.5 text-ink-muted" />
-                      1-Click Demo Profiles:
-                    </span>
-                    <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">
-                      Instant Access
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    {demoUsers.slice(0, 3).map((demoUser) => (
-                      <button
-                        key={demoUser.User_ID}
-                        type="button"
-                        onClick={() => handleQuickLogin(demoUser.InstitutionalEmail)}
-                        className="flex w-full items-center justify-between rounded-xl border border-borderline bg-surface-base/50 p-2.5 text-left transition-all hover:border-ink-secondary/30 hover:bg-surface-elevated cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2.5 overflow-hidden">
-                          <img
-                            src={demoUser.AvatarSeed}
-                            alt={demoUser.Name}
-                            className="h-7 w-7 rounded-full object-cover border border-borderline"
-                          />
-                          <div className="min-w-0">
-                            <p className="truncate text-xs font-semibold text-ink">
-                              {demoUser.Name}
-                            </p>
-                            <p className="truncate text-[10px] text-ink-muted">
-                              {demoUser.InstitutionalEmail}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          <RatingStars value={demoUser.Rating} size={11} showScore />
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </motion.div>
             ) : (
               <motion.div
@@ -675,6 +673,58 @@ export default function LoginPage() {
               >
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#1AA260]/10 text-[#1AA260]">
                   <Logo size={40} />
+                  {isOtpOpen && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-md">
+                      <motion.div
+                        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        className="w-full max-w-md rounded-3xl border border-white/30 bg-surface/90 p-7 shadow-2xl backdrop-blur-2xl sm:p-9"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="otp-heading"
+                      >
+                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2F6FED]/10 text-[#2F6FED]">
+                          <Check className="h-6 w-6" />
+                        </div>
+                        <h2 id="otp-heading" className="mt-4 text-center font-display text-2xl font-semibold text-ink">
+                          Verify your student email
+                        </h2>
+                        <p className="mt-2 text-center text-sm text-ink-muted">
+                          Enter the six-digit code sent to <strong>{email}</strong>.
+                        </p>
+                        {otpError && <p role="alert" className="mt-4 rounded-xl bg-status-danger/10 p-3 text-sm text-status-danger">{otpError}</p>}
+                        <form onSubmit={handleOtpSubmit} className="mt-5 space-y-4">
+                          <input
+                            aria-label="Six-digit verification code"
+                            type="text"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            pattern="[0-9]{6}"
+                            maxLength={6}
+                            required
+                            value={otpCode}
+                            onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                            placeholder="000000"
+                            className="w-full rounded-2xl border border-borderline bg-surface-base px-4 py-4 text-center font-mono text-2xl tracking-[0.5em] text-ink outline-none focus:border-[#2F6FED]"
+                          />
+                          <button
+                            type="submit"
+                            disabled={isVerifying}
+                            className="w-full rounded-full bg-[#111318] py-3 text-sm font-semibold text-white disabled:opacity-50 dark:bg-[#F2F3F5] dark:text-[#0D0F12]"
+                          >
+                            {isVerifying ? 'Verifying…' : 'Verify and continue'}
+                          </button>
+                        </form>
+                        <button
+                          type="button"
+                          onClick={() => void handleResendOtp()}
+                          className="mt-4 w-full text-center text-sm font-medium text-[#2F6FED] hover:underline"
+                        >
+                          Resend code
+                        </button>
+                      </motion.div>
+                    </div>
+                  )}
                 </div>
                 <h2 className="font-display text-2xl font-bold text-ink">
                   Welcome to Campus Bazaar

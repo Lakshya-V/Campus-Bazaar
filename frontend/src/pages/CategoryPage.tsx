@@ -16,7 +16,9 @@ import {
 } from 'lucide-react';
 import { useMarket } from '../context/MarketContext';
 import ListingCard from '../components/listings/ListingCard';
+import ListingCardSkeleton from '../components/listings/ListingCardSkeleton';
 import BudgetRangeSlider from '../components/home/BudgetRangeSlider';
+import SelectMenu from '../components/common/SelectMenu';
 import MarketplaceFooter from '../components/layout/MarketplaceFooter';
 import { findCategoryMeta, getCategorySlug } from '../data/mockMarketData';
 import { PAGE_VARIANTS } from '../lib/motion';
@@ -34,8 +36,10 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
 export default function CategoryPage() {
   const { categoryId } = useParams<{ categoryId: string }>();
   const navigate = useNavigate();
-  const { items, categories, fetchListings } = useMarket();
+  const { items, categories, fetchListings, isLoadingMarket } = useMarket();
   const [searchParams, setSearchParams] = useSearchParams();
+  const searchQuery = searchParams.get('q') || '';
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -64,17 +68,27 @@ export default function CategoryPage() {
   const conditionFilter = searchParams.get('condition') || '';
 
   useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
     const categoryIdForApi = matchedCustomCat?.Category_ID;
     void fetchListings({
-      search: searchParams.get('q') || undefined,
+      search: debouncedSearch || undefined,
       condition: conditionFilter || undefined,
       category: categoryIdForApi && /^\d+$/.test(categoryIdForApi) ? categoryIdForApi : undefined,
     });
-  }, [conditionFilter, fetchListings, matchedCustomCat, searchParams]);
+  }, [conditionFilter, debouncedSearch, fetchListings, matchedCustomCat]);
 
-  const searchQuery = searchParams.get('q') || '';
   const [sortBy, setSortBy] = useState<SortOption>('newest');
-  const [maxBudget, setMaxBudget] = useState<number>(500);
+  const [maxBudget, setMaxBudget] = useState<number>(10000);
+  const [settledBudget, setSettledBudget] = useState<number>(10000);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettledBudget(maxBudget), 300);
+    return () => window.clearTimeout(timer);
+  }, [maxBudget]);
 
   const CategoryIcon = CATEGORY_ICONS[currentSlug] || Layers;
 
@@ -82,7 +96,7 @@ export default function CategoryPage() {
   const categoryItems = useMemo(() => {
     return items
       .filter((item) => item.Status === 'AVAILABLE')
-      .filter((item) => !conditionFilter || item.Condition === conditionFilter)
+      .filter((item) => !conditionFilter || item.Condition.toLowerCase() === conditionFilter.toLowerCase())
       .filter((item) => {
         // Match category name or slug
         const itemCatLower = item.Category.toLowerCase();
@@ -107,8 +121,8 @@ export default function CategoryPage() {
         );
       })
       .filter((item) => {
-        if (maxBudget < 500) {
-          return item.Price <= maxBudget;
+        if (settledBudget < 10000) {
+          return item.Price <= settledBudget;
         }
         return true;
       })
@@ -118,7 +132,7 @@ export default function CategoryPage() {
         if (sortBy === 'views') return b.ViewCount - a.ViewCount;
         return new Date(b.PostedAt).getTime() - new Date(a.PostedAt).getTime();
       });
-  }, [items, targetCategoryName, categoryMeta, currentSlug, searchQuery, conditionFilter, maxBudget, sortBy]);
+  }, [items, targetCategoryName, categoryMeta, currentSlug, searchQuery, conditionFilter, settledBudget, sortBy]);
 
   function handleCategoryPillClick(catName: string) {
     if (catName === 'All Categories' || catName === 'cat_all') {
@@ -129,7 +143,7 @@ export default function CategoryPage() {
   }
 
   function handleClearFilters() {
-    setMaxBudget(500);
+    setMaxBudget(10000);
     setSortBy('newest');
     setSearchParams({}, { replace: true });
   }
@@ -218,22 +232,25 @@ export default function CategoryPage() {
             value={maxBudget}
             onChange={(val) => setMaxBudget(val)}
           />
-          <select
+          <SelectMenu
             value={conditionFilter}
-            onChange={(event) => {
+            onChange={(value) => {
               const next = new URLSearchParams(searchParams);
-              if (event.target.value) next.set('condition', event.target.value);
+              if (value) next.set('condition', value);
               else next.delete('condition');
               setSearchParams(next, { replace: true });
             }}
             className="rounded-full border border-borderline bg-surface-base px-3 py-2 text-xs text-ink outline-none"
             aria-label="Filter by condition"
-          >
-            <option value="">All conditions</option>
-            <option value="new">New</option>
-            <option value="good">Good</option>
-            <option value="fair">Fair</option>
-          </select>
+            options={[
+              { value: '', label: 'All conditions' },
+              { value: 'Brand New', label: 'Brand New' },
+              { value: 'Like New', label: 'Like New' },
+              { value: 'Good', label: 'Good' },
+              { value: 'Fair Use', label: 'Fair Use' },
+              { value: 'Books & Notes', label: 'Books & Notes' },
+            ]}
+          />
 
           <div className="flex items-center gap-1.5 text-xs">
             <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-ink-muted mr-1">
@@ -305,7 +322,11 @@ export default function CategoryPage() {
 
       {/* Empty Filter State */}
       {categoryItems.length === 0 && (
-        <div className="rounded-3xl border border-dashed border-borderline bg-black/[0.01] py-16 text-center dark:bg-white/[0.01]">
+        isLoadingMarket && items.length === 0 ? (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }, (_, index) => <ListingCardSkeleton key={index} />)}
+          </div>
+        ) : <div className="rounded-3xl border border-dashed border-borderline bg-black/[0.01] py-16 text-center dark:bg-white/[0.01]">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2F6FED]/10 text-[#2F6FED] dark:text-[#4F8CFF]">
             <SlidersHorizontal className="h-6 w-6" />
           </div>

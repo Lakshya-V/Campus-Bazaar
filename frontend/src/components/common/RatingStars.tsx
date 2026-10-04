@@ -27,8 +27,9 @@ export default function RatingStars({
 
   return (
     <div className="inline-flex items-center gap-1.5 select-none">
-      <div className="flex items-center gap-0.5">
-        {[1, 2, 3, 4, 5].map((star) => {
+      {!(showScore && count === 0) && (
+        <div className="flex items-center gap-0.5">
+          {[1, 2, 3, 4, 5].map((star) => {
           const isFilled = star <= Math.round(activeValue);
 
           if (!interactive) {
@@ -67,16 +68,15 @@ export default function RatingStars({
               />
             </motion.button>
           );
-        })}
-      </div>
+          })}
+        </div>
+      )}
 
       {showScore && (
         <span className="text-xs font-semibold tabular-nums text-ink">
-          {value.toFixed(1)}
+          {count === 0 ? '0.0 ★ (No ratings yet)' : value.toFixed(1)}
           {count !== undefined && (
-            <span className="ml-1 text-[11px] font-normal text-ink-muted">
-              ({count})
-            </span>
+            count > 0 && <span className="ml-1 text-[11px] font-normal text-ink-muted">({count})</span>
           )}
         </span>
       )}

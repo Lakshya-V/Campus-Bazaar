@@ -16,13 +16,19 @@ import {
 } from 'lucide-react';
 import { useMarket } from '../context/MarketContext';
 import { useAuth } from '../context/AuthContext';
+import type { ListingCondition } from '../types/market';
 import { Apple3DCard } from '../components/common/Apple3DCard';
 import RatingStars from '../components/common/RatingStars';
 import { POP_SPRING, MODAL_BACKDROP_VARIANTS, MODAL_CONTENT_VARIANTS } from '../lib/motion';
 import { useCartSwipe } from '../context/CartSwipeContext';
 import { getCategorySlug } from '../data/mockMarketData';
 
-const CONDITION_STYLES = {
+const CONDITION_STYLES: Record<ListingCondition, string> = {
+  'Brand New': 'bg-[#1AA260] text-white dark:bg-[#1AA260] dark:text-[#0D0F12]',
+  'Like New': 'bg-[#2F6FED] text-white dark:bg-[#2F6FED] dark:text-[#0D0F12]',
+  Good: 'bg-[#2F6FED] text-white dark:bg-[#2F6FED] dark:text-[#0D0F12]',
+  'Fair Use': 'bg-[#E0912B] text-white dark:bg-[#E0912B] dark:text-[#0D0F12]',
+  'Books & Notes': 'bg-[#7C5CE7] text-white dark:bg-[#7C5CE7] dark:text-[#0D0F12]',
   new: 'bg-[#1AA260] text-white dark:bg-[#1AA260] dark:text-[#0D0F12]',
   good: 'bg-[#2F6FED] text-white dark:bg-[#2F6FED] dark:text-[#0D0F12]',
   fair: 'bg-[#E0912B] text-white dark:bg-[#E0912B] dark:text-[#0D0F12]',
@@ -42,6 +48,7 @@ export default function ListingDetailPage() {
     toggleWishlist,
     startChatSession,
     markItemSold,
+    toggleItemStatus,
   } = useMarket();
 
   const item = getItem(id || '');
@@ -49,7 +56,7 @@ export default function ListingDetailPage() {
   // Increment view count on mount & record to recently viewed
   useEffect(() => {
     if (id) {
-      incrementItemView(id);
+      incrementItemView();
       recordViewedItem(id);
     }
   }, [id, incrementItemView, recordViewedItem]);
@@ -102,7 +109,7 @@ export default function ListingDetailPage() {
   async function handleStartChat() {
     setIsStartingChat(true);
     try {
-      const session = await startChatSession(currentItem.Item_ID, currentItem.Seller_ID);
+      const session = await startChatSession(currentItem.Item_ID);
       triggerCartSwipe(`/chat/${session.Session_ID}`, {
         message: 'Connecting to student chat...',
         duration: 750,
@@ -115,11 +122,12 @@ export default function ListingDetailPage() {
 
   function handleConfirmMarkSold() {
     setShowSoldModal(false);
-    setDealClosedStamp(true);
-    markItemSold(currentItem.Item_ID);
-    setTimeout(() => {
-      setDealClosedStamp(false);
-    }, 2500);
+    void markItemSold(currentItem.Item_ID).then(() => {
+      setDealClosedStamp(true);
+      setTimeout(() => setDealClosedStamp(false), 2500);
+    }).catch((error) => {
+      window.alert(error instanceof Error ? error.message : 'Could not update listing status.');
+    });
   }
 
   return (
@@ -271,7 +279,7 @@ export default function ListingDetailPage() {
               </span>
               <span
                 className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wider border shadow-xs ${
-                  CONDITION_STYLES[item.Condition]
+                  CONDITION_STYLES[item.Condition] || CONDITION_STYLES.Good
                 }`}
               >
                 {item.Condition.toUpperCase()} CONDITION
@@ -291,7 +299,7 @@ export default function ListingDetailPage() {
               {/* Oversized Poppins Display Price */}
               <div className="flex items-baseline gap-3 pt-1">
                 <span className="font-display text-4xl sm:text-5xl font-bold tracking-tight text-ink">
-                  ${item.Price}
+                  ₹{item.Price.toLocaleString('en-IN')}
                 </span>
                 <span className="text-xs uppercase tracking-wider text-ink-muted">
                   fixed campus peer price
@@ -330,6 +338,9 @@ export default function ListingDetailPage() {
                       )}
                     </div>
                     <p className="text-[11px] text-ink-muted">{seller?.Role}</p>
+                    {seller?.HostelBuilding && (
+                      <p className="mt-0.5 text-[11px] text-ink-muted">{seller.HostelBuilding}</p>
+                    )}
                   </div>
                 </div>
 
@@ -361,9 +372,15 @@ export default function ListingDetailPage() {
                         <span>Mark Sold</span>
                       </button>
                     ) : (
-                      <div className="flex items-center justify-center gap-2 rounded-full bg-[#E24C4B] py-3 text-xs font-semibold text-white">
-                        Listing Sold
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void toggleItemStatus(item.Item_ID).catch((error) =>
+                          window.alert(error instanceof Error ? error.message : 'Could not update listing status.')
+                        )}
+                        className="flex items-center justify-center gap-2 rounded-full border border-borderline py-3 text-xs font-semibold text-ink"
+                      >
+                        Mark Available
+                      </button>
                     )}
 
                     <button
@@ -463,7 +480,7 @@ export default function ListingDetailPage() {
                     {sim.Title}
                   </h4>
                   <span className="block font-display text-base font-bold text-ink">
-                    ${sim.Price}
+                    ₹{sim.Price.toLocaleString('en-IN')}
                   </span>
                 </div>
               </Link>
