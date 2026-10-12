@@ -44,7 +44,14 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { items, categories, fetchListings, isLoadingMarket } = useMarket();
+  const {
+    items,
+    categories,
+    fetchListings,
+    isLoadingListings,
+    hasLoadedListings,
+    listingFetchError,
+  } = useMarket();
   const [searchParams, setSearchParams] = useSearchParams();
   const conditionFilter = searchParams.get('condition') || '';
   const searchQuery = searchParams.get('q') || '';
@@ -135,7 +142,8 @@ export default function HomePage() {
           items: matchingFiltered.slice(0, 4),
           hasMatches: matchingFiltered.length > 0,
         };
-      });
+      })
+      .filter((section) => section.totalAvailable > 0);
   }, [categories, items, filteredItems]);
 
   function handleCategoryPillClick(catName: string, categorySlug?: string) {
@@ -153,8 +161,10 @@ export default function HomePage() {
     setSearchParams({}, { replace: true });
   }
 
-  const hasActiveFilters = searchQuery.trim() !== '' || maxBudget < 10000;
+  const hasActiveFilters =
+    searchQuery.trim() !== '' || conditionFilter !== '' || maxBudget < 10000;
   const hasAnyMatches = categorySections.some((sec) => sec.hasMatches);
+  const hasAnyActiveListings = items.some((item) => item.Status === 'AVAILABLE');
 
   return (
     <motion.div
@@ -306,7 +316,7 @@ export default function HomePage() {
           ═══════════════════════════════════════════════════════════════ */}
       <div className="min-h-screen space-y-12 pb-16">
         {categorySections.map(({ meta, totalAvailable, items: catItems, hasMatches }) => {
-          if (!hasMatches && !isLoadingMarket) return null;
+          if (!hasMatches && totalAvailable > 0 && hasActiveFilters) return null;
           const Icon = CATEGORY_ICONS[meta.slug] || Layers;
 
           return (
@@ -348,7 +358,7 @@ export default function HomePage() {
               </div>
 
               <div
-                aria-busy={isLoadingMarket && !hasMatches}
+                aria-busy={isLoadingListings}
                 className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
               >
                 {hasMatches
@@ -357,9 +367,15 @@ export default function HomePage() {
                         <ListingCard item={item} />
                       </div>
                     ))
-                  : Array.from({ length: 4 }, (_, index) => (
+                  : !hasLoadedListings
+                  ? Array.from({ length: 4 }, (_, index) => (
                       <ListingCardSkeleton key={`${meta.id}-skeleton-${index}`} />
-                    ))}
+                    ))
+                  : (
+                    <p className="col-span-full py-8 text-center text-sm font-medium text-slate-400">
+                      No items found in this category.
+                    </p>
+                  )}
               </div>
             </section>
           );
@@ -368,11 +384,16 @@ export default function HomePage() {
 
       {/* Empty Filter State (if no categories match criteria) */}
       {!hasAnyMatches && (
-        isLoadingMarket && categories.length === 0 ? (
+        !hasLoadedListings ? (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: 4 }, (_, index) => <ListingCardSkeleton key={index} />)}
           </div>
-        ) : <div className="rounded-3xl border border-dashed border-borderline bg-black/[0.01] py-16 text-center dark:bg-white/[0.01]">
+        ) : listingFetchError ? (
+          <div role="alert" className="py-12 text-center text-status-danger">
+            <p className="text-lg font-medium">Listings could not be loaded.</p>
+            <p className="mt-2 text-sm">{listingFetchError}</p>
+          </div>
+        ) : hasActiveFilters ? <div className="rounded-3xl border border-dashed border-borderline bg-black/[0.01] py-16 text-center dark:bg-white/[0.01]">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2F6FED]/10 text-[#2F6FED] dark:text-[#4F8CFF]">
             <SlidersHorizontal className="h-6 w-6" />
           </div>
@@ -390,7 +411,13 @@ export default function HomePage() {
             <RotateCcw className="h-3.5 w-3.5" />
             Reset all filters
           </button>
-        </div>
+        </div> : !hasAnyActiveListings ? (
+          <div className="rounded-3xl border border-dashed border-borderline bg-black/[0.01] py-16 text-center dark:bg-white/[0.01]">
+            <h3 className="font-display text-lg font-bold text-ink">
+              No listings available on Campus Bazaar right now. Be the first to post!
+            </h3>
+          </div>
+        ) : null
       )}
 
       {/* ═══════════════════════════════════════════════════════════════

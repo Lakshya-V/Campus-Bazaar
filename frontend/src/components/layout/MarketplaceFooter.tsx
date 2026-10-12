@@ -11,10 +11,9 @@ const FOOTER_RULES = [
   'Report suspicious listings, impersonation, or academic policy violations to campus safety or contact the student moderation desk.',
 ];
 
-const ROTATING_QUOTES = [
+const ROTATING_QUOTES: { quote: string; attribution?: string }[] = [
   {
     quote: '“Pass it forward — the textbook or equipment that powered your semester can kickstart someone else’s journey.”',
-    attribution: 'Campus Circular Economy Initiative',
   },
   {
     quote: '“True campus community thrives when sustainable resourcefulness and student trust become second nature.”',
@@ -113,13 +112,13 @@ export default function MarketplaceFooter({
             </div>
             <p className="text-xs text-ink-muted leading-relaxed font-body">
               A student-built peer-to-peer marketplace project for{' '}
-              <span className="font-medium text-ink">[Institution / CSE Software Capstone 2026]</span>
+              <span className="font-medium text-ink">VIT</span>
               . Designed to make university life more affordable, sustainable, and connected by connecting campus peers directly.
             </p>
             <p className="text-[11px] text-ink-muted">
               Built by{' '}
               <span className="font-medium text-ink">
-                [Project Team: Alex Rivera, Sarah Chen &amp; Jordan Taylor]
+                Lakshya Vats and Ojasvi Uppal
               </span>
               .
             </p>
@@ -129,8 +128,7 @@ export default function MarketplaceFooter({
             <span className="font-semibold uppercase tracking-wider text-ink-secondary mb-1">
               Tech Stack
             </span>
-            <span>React 18 · TypeScript · Tailwind CSS</span>
-            <span>Framer Motion · Django REST Framework</span>
+            <span>React · Tailwind CSS · Django REST Framework · PostgreSQL (Supabase)</span>
           </div>
         </div>
       </section>
@@ -155,9 +153,11 @@ export default function MarketplaceFooter({
               <Quote className="h-3 w-3 text-[#2F6FED]/60 flex-shrink-0" />
               <span>{currentQuote.quote}</span>
             </div>
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-muted/60">
-              — {currentQuote.attribution}
-            </span>
+            {currentQuote.attribution && (
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-muted/60">
+                — {currentQuote.attribution}
+              </span>
+            )}
           </motion.div>
         </AnimatePresence>
       </section>

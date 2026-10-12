@@ -154,6 +154,7 @@ interface MarketContextValue {
   items: Item[];
   isLoadingMarket: boolean;
   isLoadingListings: boolean;
+  hasLoadedListings: boolean;
   listingFetchError: string | null;
   fetchListings: (filters?: ListingFilters) => Promise<void>;
   getItem: (itemId: string) => Item | undefined;
@@ -247,6 +248,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoadingMarket, setIsLoadingMarket] = useState(false);
   const [isLoadingListings, setIsLoadingListings] = useState(false);
+  const [hasLoadedListings, setHasLoadedListings] = useState(false);
   const [listingFetchError, setListingFetchError] = useState<string | null>(null);
   const [loadingMessagesFor, setLoadingMessagesFor] = useState<string | null>(null);
 
@@ -369,6 +371,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
               : namesById.get(Number(listing.category)) || 'All Categories',
         }))
       );
+      setHasLoadedListings(true);
 
       setChatSessions(
         rawConversations.map((conversation) => {
@@ -486,6 +489,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
         throw error;
       } finally {
         setIsLoadingListings(false);
+        setHasLoadedListings(true);
       }
     },
     [toItem]
@@ -510,6 +514,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       setNotifications([]);
       setIsLoadingMarket(false);
       setIsLoadingListings(false);
+      setHasLoadedListings(false);
       setListingFetchError(null);
     };
     window.addEventListener(AUTH_LOGOUT_EVENT, clearPrivateMarketState);
@@ -876,7 +881,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<MarketContextValue>(() => ({
-    users, getUser, items, isLoadingMarket, isLoadingListings, listingFetchError, fetchListings, getItem, addItem, markItemSold, toggleItemStatus, incrementItemView,
+    users, getUser, items, isLoadingMarket, isLoadingListings, hasLoadedListings, listingFetchError, fetchListings, getItem, addItem, markItemSold, toggleItemStatus, incrementItemView,
     categories, wishlist, toggleWishlist, isWishlisted,
     recentlyViewedIds, recordViewedItem, chatSessions, messages,
     getSessionsForUser, getSessionById, getMessagesForSession, fetchSessionMessages, loadingMessagesFor, startChatSession,
@@ -885,7 +890,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
     unreadNotificationCount: notifications.filter((notification) => notification.unread).length,
     markNotificationsRead,
   }), [
-    users, getUser, items, isLoadingMarket, isLoadingListings, listingFetchError, fetchListings, getItem, addItem, markItemSold, toggleItemStatus, incrementItemView,
+    users, getUser, items, isLoadingMarket, isLoadingListings, hasLoadedListings, listingFetchError, fetchListings, getItem, addItem, markItemSold, toggleItemStatus, incrementItemView,
     categories, wishlist, toggleWishlist, isWishlisted,
     recentlyViewedIds, recordViewedItem, chatSessions, messages,
     getSessionsForUser, getSessionById, getMessagesForSession, fetchSessionMessages, loadingMessagesFor, startChatSession,

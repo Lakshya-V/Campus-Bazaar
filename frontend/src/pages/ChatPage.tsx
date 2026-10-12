@@ -1,6 +1,6 @@
 // src/pages/ChatPage.tsx
 import { useState, useEffect, useRef, useMemo, type FormEvent } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
@@ -27,7 +27,9 @@ import {
 } from '../lib/motion';
 
 export default function ChatPage() {
-  const { sessionId } = useParams<{ sessionId?: string }>();
+  const { sessionId: routeSessionId } = useParams<{ sessionId?: string }>();
+  const [searchParams] = useSearchParams();
+  const sessionId = routeSessionId || searchParams.get('conversationId') || undefined;
   const navigate = useNavigate();
   const { user } = useAuth();
   const {
