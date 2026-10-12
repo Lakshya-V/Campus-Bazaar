@@ -14,10 +14,12 @@ import {
   ShoppingBag,
   ExternalLink,
   Search,
+  Star,
 } from 'lucide-react';
 import { useMarket } from '../context/MarketContext';
 import { useAuth } from '../context/AuthContext';
 import RatingStars from '../components/common/RatingStars';
+import RatingModal from '../components/common/RatingModal';
 import {
   POP_SPRING,
   MODAL_BACKDROP_VARIANTS,
@@ -38,7 +40,6 @@ export default function ChatPage() {
     getItem,
     getUser,
     markItemSold,
-    addRating,
     hasRated,
     markNotificationsRead,
   } = useMarket();
@@ -56,12 +57,14 @@ export default function ChatPage() {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showSoldConfirm, setShowSoldConfirm] = useState(false);
   const [dealClosedStamp, setDealClosedStamp] = useState(false);
-  const [ratingScore, setRatingScore] = useState(5);
-  const [ratingComment, setRatingComment] = useState('');
-  const [ratingSubmitted, setRatingSubmitted] = useState(false);
-  const [ratingError, setRatingError] = useState<string | null>(null);
+  const [ratingModalSessionId, setRatingModalSessionId] = useState<string | null>(null);
+  const [ratingSubmittedFor, setRatingSubmittedFor] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const prevMessagesLength = useRef(0);
+  const prevSessionId = useRef<string | null>(null);
+  const isAtBottomRef = useRef(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // User's conversations
@@ -106,10 +109,73 @@ export default function ChatPage() {
     (isSeller ? activeSession?.BuyerName : activeSession?.SellerName) ||
     'Campus Peer';
 
-  // Auto-scroll on new messages
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+    isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 100;
+  };
+
+  // Scroll on initial load and new messages only while the reader is at the bottom.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, sessionId]);
+    const currentSessionId = activeSession?.Session_ID ?? null;
+    if (prevSessionId.current !== currentSessionId) {
+      prevSessionId.current = currentSessionId;
+      prevMessagesLength.current = 0;
+      isAtBottomRef.current = true;
+    }
+
+    const isFirstLoad = prevMessagesLength.current === 0;
+    const isNewMessage = messages.length > prevMessagesLength.current;
+
+    if (isFirstLoad || (isNewMessage && isAtBottomRef.current)) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevMessagesLength.current = messages.length;
+  }, [activeSession?.Session_ID, messages.length]);
+
+  useEffect(() => {
+    const previewUrl = pendingMedia?.url;
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [pendingMedia?.url]);
+
+  function processPastedFile(file: File) {
+    if (!file.type.startsWith('image/')) return;
+    const url = URL.createObjectURL(file);
+    setPendingMedia({
+      file,
+      url,
+      type: 'image',
+      name: file.name || 'clipboard-image.png',
+    });
+  }
+
+  function handlePaste(e: React.ClipboardEvent) {
+    const files = e.clipboardData?.files;
+    if (files && files.length > 0) {
+      for (let i = 0; i < files.length; i++) {
+        if (files[i].type.startsWith('image/')) {
+          e.preventDefault();
+          processPastedFile(files[i]);
+          return;
+        }
+      }
+    }
+    const items = e.clipboardData?.items;
+    if (items && items.length > 0) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          const file = items[i].getAsFile();
+          if (file) {
+            e.preventDefault();
+            processPastedFile(file);
+            return;
+          }
+        }
+      }
+    }
+  }
 
   // Filtered session list for left sidebar
   const filteredSessions = useMemo(() => {
@@ -146,10 +212,7 @@ export default function ChatPage() {
   }
 
   function handleRemovePendingMedia() {
-    if (pendingMedia) {
-      URL.revokeObjectURL(pendingMedia.url);
-      setPendingMedia(null);
-    }
+    setPendingMedia(null);
   }
 
   const isSold = activeItem?.Status === 'SOLD';
@@ -157,6 +220,8 @@ export default function ChatPage() {
     isBuyer && (activeSession?.SoldToBuyer || activeItem?.WinningBuyer_ID === user?.User_ID);
   const isLostBuyer = isBuyer && isSold && !isWinningBuyer;
   const alreadyRated = user && activeSession ? hasRated(activeSession.Session_ID, user.User_ID) : false;
+  const ratingSubmitted = activeSession?.Session_ID === ratingSubmittedFor;
+  const showRatingModal = activeSession?.Session_ID === ratingModalSessionId;
 
   async function handleSendMessage(e: FormEvent) {
     e.preventDefault();
@@ -192,18 +257,6 @@ export default function ChatPage() {
       setTimeout(() => setDealClosedStamp(false), 2400);
     } catch (error) {
       setMessageError(error instanceof Error ? error.message : 'Could not update listing status.');
-    }
-  }
-
-  async function handleRateSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!activeSession || !otherUserId) return;
-    setRatingError(null);
-    try {
-      await addRating(activeSession.Session_ID, otherUserId, ratingScore, ratingComment);
-      setRatingSubmitted(true);
-    } catch (error) {
-      setRatingError(error instanceof Error ? error.message : 'Could not submit your rating.');
     }
   }
 
@@ -483,6 +536,18 @@ export default function ChatPage() {
                       Mark Sold
                     </button>
                   )}
+
+                  {/* Rate Seller button for buyer */}
+                  {isWinningBuyer && !alreadyRated && !ratingSubmitted && (
+                    <button
+                      type="button"
+                      onClick={() => setRatingModalSessionId(activeSession?.Session_ID ?? null)}
+                      className="flex items-center gap-1.5 rounded-xl border border-borderline bg-surface-elevated px-3 py-1.5 text-xs font-semibold text-ink hover:border-[#2F6FED] transition-colors cursor-pointer"
+                    >
+                      <Star className="h-3.5 w-3.5 text-[#F2A93B]" />
+                      <span>Rate Seller</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -505,7 +570,11 @@ export default function ChatPage() {
               )}
 
               {/* Message History Feed */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-surface-base/30">
+              <div
+                ref={scrollContainerRef}
+                onScroll={handleScroll}
+                className="flex-1 overflow-y-auto p-4 space-y-3.5 bg-surface-base/30"
+              >
                 {/* Handshake greeting pill */}
                 <div className="text-center py-2">
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-borderline bg-surface/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-ink-muted backdrop-blur-md">
@@ -565,7 +634,7 @@ export default function ChatPage() {
                                   src={message.MediaUrl}
                                   alt="Attachment"
                                   onClick={() => setLightboxUrl(message.MediaUrl || null)}
-                                  className="max-h-56 w-full rounded-xl object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                                  className="max-h-56 w-full rounded-xl object-contain bg-slate-900/60 cursor-pointer hover:opacity-95 transition-opacity"
                                 />
                               )}
                             </div>
@@ -586,59 +655,28 @@ export default function ChatPage() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Peer Rating Prompt (if sold and buyer hasn't rated) */}
-              {isWinningBuyer && !alreadyRated && !ratingSubmitted && (
-                <div className="border-t border-borderline bg-surface p-4">
-                  <form onSubmit={handleRateSubmit} className="space-y-3">
-                    {ratingError && <p role="alert" className="text-xs text-status-danger">{ratingError}</p>}
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-ink">
-                        Rate your peer hand-off with {otherUserName}
-                      </span>
-                      <div className="flex items-center gap-1">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            type="button"
-                            onClick={() => setRatingScore(star)}
-                            className="text-amber-400 hover:scale-110 transition-transform"
-                          >
-                            ★
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={ratingComment}
-                        onChange={(e) => setRatingComment(e.target.value)}
-                        placeholder="Leave feedback on item condition and punctuality..."
-                        className="flex-1 rounded-full border border-borderline bg-surface-base px-3.5 py-1.5 text-xs text-ink outline-none"
-                      />
-                      <button
-                        type="submit"
-                        className="rounded-full bg-[#1AA260] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#15824d]"
-                      >
-                        Submit
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
-
               {/* Message Composer Input Bar (Apple iMessage Pill Design) */}
               <div className="border-t border-borderline p-3 sm:p-4 bg-surface/90 backdrop-blur-md">
-                {/* Media preview tag if selected */}
+                {/* Media preview tag with instant thumbnail preview */}
                 {pendingMedia && (
                   <div className="mb-2 flex items-center justify-between rounded-xl border border-borderline bg-surface-base p-2">
-                    <span className="text-xs text-ink truncate max-w-xs">
-                      📎 {pendingMedia.name}
-                    </span>
+                    <div className="flex items-center gap-2 truncate max-w-xs">
+                      {pendingMedia.type === 'image' && (
+                        <img
+                          src={pendingMedia.url}
+                          alt="Thumbnail preview"
+                          className="h-10 w-10 rounded-lg object-contain bg-slate-900/60 shadow-xs flex-shrink-0"
+                        />
+                      )}
+                      <span className="text-xs text-ink truncate">
+                        📎 {pendingMedia.name}
+                      </span>
+                    </div>
                     <button
                       type="button"
                       onClick={handleRemovePendingMedia}
-                      className="text-ink-muted hover:text-ink"
+                      className="text-ink-muted hover:text-ink p-1 rounded-lg hover:bg-surface-elevated transition-colors"
+                      title="Remove attachment"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -676,10 +714,11 @@ export default function ChatPage() {
                     disabled={isLostBuyer}
                     value={inputMessage}
                     onChange={(e) => setInputMessage(e.target.value)}
+                    onPaste={handlePaste}
                     placeholder={
                       isLostBuyer
                         ? 'Listing is closed'
-                        : `Message ${otherUserName}...`
+                        : `Message ${otherUserName}... (Paste image with Ctrl+V)`
                     }
                     className="flex-1 rounded-full border border-borderline bg-surface-base px-4 py-2.5 text-xs sm:text-sm text-ink placeholder-ink-muted/50 outline-none transition focus:border-[#2F6FED] disabled:opacity-50"
                   />
@@ -816,6 +855,20 @@ export default function ChatPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* RATING MODAL */}
+      {activeSession && (
+        <RatingModal
+          isOpen={showRatingModal}
+          onClose={() => setRatingModalSessionId(null)}
+          conversationId={activeSession.Session_ID}
+          sellerName={otherUserName}
+          sellerId={activeSession.Seller_ID}
+          onSuccess={() => {
+            setRatingSubmittedFor(activeSession.Session_ID);
+          }}
+        />
+      )}
     </div>
   );
 }

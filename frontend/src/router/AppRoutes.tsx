@@ -9,6 +9,7 @@ import CreateListingPage from '../pages/CreateListingPage';
 import ChatPage from '../pages/ChatPage';
 import ProfilePage from '../pages/ProfilePage';
 import CategoryPage from '../pages/CategoryPage';
+import ResetPasswordPage from '../pages/ResetPasswordPage';
 import { useAuth } from '../context/AuthContext';
 
 export default function AppRoutes() {
@@ -24,7 +25,13 @@ export default function AppRoutes() {
             element={isAuthenticated ? <HomePage /> : <LoginPage />}
           />
 
-          {/* Dedicated Category Full Browsing Route */}
+          {/* Dedicated Category & Browse Full Browsing Routes */}
+          <Route
+            path="/browse"
+            element={
+              isAuthenticated ? <CategoryPage /> : <Navigate to="/" replace />
+            }
+          />
           <Route
             path="/category/:categoryId"
             element={
@@ -88,6 +95,12 @@ export default function AppRoutes() {
           <Route
             path="/login"
             element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />}
+          />
+
+          {/* Password Reset route */}
+          <Route
+            path="/reset-password"
+            element={<ResetPasswordPage />}
           />
 
           {/* Catch-all fallback */}

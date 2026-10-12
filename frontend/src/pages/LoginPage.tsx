@@ -1,6 +1,6 @@
 // src/pages/LoginPage.tsx
 import { useState, useRef, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import {
   Mail,
@@ -626,9 +626,19 @@ export default function LoginPage() {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-ink-muted mb-1.5">
-                      Password
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
+                        Password
+                      </label>
+                      {authMode === 'login' && (
+                        <Link
+                          to="/reset-password"
+                          className="text-[11px] font-medium text-[#2F6FED] hover:underline"
+                        >
+                          Forgot password?
+                        </Link>
+                      )}
+                    </div>
                     <input
                       type="password"
                       required

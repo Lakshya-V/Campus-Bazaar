@@ -5,8 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
   ArrowUpDown,
-  RotateCcw,
-  SlidersHorizontal,
   Layers,
   Laptop,
   BookOpen,
@@ -25,6 +23,14 @@ import { PAGE_VARIANTS } from '../lib/motion';
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'views';
 
+function conditionKey(value: string): string {
+  const key = value.toLowerCase().trim().replace(/[\s-]+/g, '_');
+  if (key === 'brand_new') return 'new';
+  if (key === 'fair_use') return 'fair';
+  if (key === 'books_&_notes' || key === 'books_and_notes') return 'used';
+  return key;
+}
+
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   'electronics-tech': Laptop,
   textbooks: BookOpen,
@@ -36,34 +42,45 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
 export default function CategoryPage() {
   const { categoryId } = useParams<{ categoryId: string }>();
   const navigate = useNavigate();
-  const { items, categories, fetchListings, isLoadingMarket } = useMarket();
+  const {
+    items,
+    categories,
+    fetchListings,
+    isLoadingListings,
+    listingFetchError,
+  } = useMarket();
   const [searchParams, setSearchParams] = useSearchParams();
+  const requestedCategory = categoryId || searchParams.get('category') || '';
   const searchQuery = searchParams.get('q') || '';
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
+  const [resolvedRequestKey, setResolvedRequestKey] = useState<string | null>(null);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }, [categoryId]);
+  }, [requestedCategory]);
 
   const matchedCustomCat = useMemo(() => {
+    if (!requestedCategory) return undefined;
     return categories.find(
       (c) =>
-        getCategorySlug(c.Name) === categoryId ||
-        c.Name.toLowerCase() === (categoryId || '').toLowerCase() ||
-        c.Category_ID === categoryId
+        (c.Slug || getCategorySlug(c.Name)) === requestedCategory ||
+        c.Name.toLowerCase() === requestedCategory.toLowerCase() ||
+        c.Category_ID === requestedCategory
     );
-  }, [categories, categoryId]);
+  }, [categories, requestedCategory]);
 
-  const categoryMeta = findCategoryMeta(categoryId || '');
-  const targetCategoryName = categoryMeta
-    ? categoryMeta.name
+  const categoryMeta = requestedCategory ? findCategoryMeta(requestedCategory) : undefined;
+  const targetCategoryName = !requestedCategory
+    ? 'All Categories'
     : matchedCustomCat
     ? matchedCustomCat.Name
-    : categoryId || '';
-  const currentSlug = categoryMeta
+    : categoryMeta
+    ? categoryMeta.name
+    : requestedCategory;
+  const currentSlug = matchedCustomCat
+    ? matchedCustomCat.Slug || getCategorySlug(matchedCustomCat.Name)
+    : categoryMeta
     ? categoryMeta.slug
-    : matchedCustomCat
-    ? getCategorySlug(matchedCustomCat.Name)
     : getCategorySlug(targetCategoryName);
   const conditionFilter = searchParams.get('condition') || '';
 
@@ -73,13 +90,34 @@ export default function CategoryPage() {
   }, [searchQuery]);
 
   useEffect(() => {
-    const categoryIdForApi = matchedCustomCat?.Category_ID;
-    void fetchListings({
+    const filters = {
       search: debouncedSearch || undefined,
       condition: conditionFilter || undefined,
-      category: categoryIdForApi && /^\d+$/.test(categoryIdForApi) ? categoryIdForApi : undefined,
-    });
-  }, [conditionFilter, debouncedSearch, fetchListings, matchedCustomCat]);
+      category: requestedCategory ? currentSlug : undefined,
+    };
+    const requestKey = JSON.stringify(filters);
+    let cancelled = false;
+    void fetchListings(filters)
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setResolvedRequestKey(requestKey);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    conditionFilter,
+    currentSlug,
+    debouncedSearch,
+    fetchListings,
+    requestedCategory,
+  ]);
+  const listingRequestKey = JSON.stringify({
+    search: debouncedSearch || undefined,
+    condition: conditionFilter || undefined,
+    category: requestedCategory ? currentSlug : undefined,
+  });
+  const isLoadingCategory = isLoadingListings || resolvedRequestKey !== listingRequestKey;
 
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [maxBudget, setMaxBudget] = useState<number>(10000);
@@ -96,17 +134,15 @@ export default function CategoryPage() {
   const categoryItems = useMemo(() => {
     return items
       .filter((item) => item.Status === 'AVAILABLE')
-      .filter((item) => !conditionFilter || item.Condition.toLowerCase() === conditionFilter.toLowerCase())
+      .filter((item) => !conditionFilter || conditionKey(item.Condition) === conditionKey(conditionFilter))
       .filter((item) => {
+        if (!requestedCategory) return true;
+        if (matchedCustomCat) {
+          return item.Category.toLowerCase() === matchedCustomCat.Name.toLowerCase();
+        }
         // Match category name or slug
         const itemCatLower = item.Category.toLowerCase();
         const targetLower = targetCategoryName.toLowerCase();
-        if (categoryMeta) {
-          return (
-            itemCatLower === categoryMeta.name.toLowerCase() ||
-            itemCatLower.includes(categoryMeta.slug.replace('-', ' '))
-          );
-        }
         return (
           itemCatLower === targetLower ||
           getCategorySlug(item.Category) === currentSlug
@@ -132,20 +168,15 @@ export default function CategoryPage() {
         if (sortBy === 'views') return b.ViewCount - a.ViewCount;
         return new Date(b.PostedAt).getTime() - new Date(a.PostedAt).getTime();
       });
-  }, [items, targetCategoryName, categoryMeta, currentSlug, searchQuery, conditionFilter, settledBudget, sortBy]);
+  }, [items, requestedCategory, matchedCustomCat, targetCategoryName, currentSlug, searchQuery, conditionFilter, settledBudget, sortBy]);
 
-  function handleCategoryPillClick(catName: string) {
+  function handleCategoryPillClick(catName: string, categorySlug?: string) {
     if (catName === 'All Categories' || catName === 'cat_all') {
-      navigate('/');
+      navigate('/browse');
     } else {
-      navigate(`/category/${getCategorySlug(catName)}`);
+      const slug = categorySlug || getCategorySlug(catName);
+      navigate(`/browse?category=${encodeURIComponent(slug)}`);
     }
-  }
-
-  function handleClearFilters() {
-    setMaxBudget(10000);
-    setSortBy('newest');
-    setSearchParams({}, { replace: true });
   }
 
   return (
@@ -206,14 +237,14 @@ export default function CategoryPage() {
         <div className="no-scrollbar flex items-center gap-2 overflow-x-auto pb-1">
           {categories.map((cat) => {
             const isAll = cat.Name === 'All Categories';
-            const catSlug = getCategorySlug(cat.Name);
+            const catSlug = cat.Slug || getCategorySlug(cat.Name);
             const isSelected = !isAll && catSlug === currentSlug;
 
             return (
               <button
                 key={cat.Category_ID}
                 type="button"
-                onClick={() => handleCategoryPillClick(cat.Name)}
+                onClick={() => handleCategoryPillClick(cat.Name, cat.Slug)}
                 className={`flex-shrink-0 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
                   isSelected
                     ? 'bg-[#2F6FED] text-white shadow-sm'
@@ -244,11 +275,11 @@ export default function CategoryPage() {
             aria-label="Filter by condition"
             options={[
               { value: '', label: 'All conditions' },
-              { value: 'Brand New', label: 'Brand New' },
-              { value: 'Like New', label: 'Like New' },
-              { value: 'Good', label: 'Good' },
-              { value: 'Fair Use', label: 'Fair Use' },
-              { value: 'Books & Notes', label: 'Books & Notes' },
+              { value: 'new', label: 'New' },
+              { value: 'like_new', label: 'Like New' },
+              { value: 'good', label: 'Good' },
+              { value: 'fair', label: 'Fair' },
+              { value: 'used', label: 'Used' },
             ]}
           />
 
@@ -283,68 +314,67 @@ export default function CategoryPage() {
       </div>
 
       {/* Full Category Grid */}
-      <motion.div
-        key={`${currentSlug}-${maxBudget}-${sortBy}-${searchQuery}`}
-        variants={{
-          hidden: { opacity: 0 },
-          show: {
-            opacity: 1,
-            transition: { staggerChildren: 0.05 },
-          },
-        }}
-        initial="hidden"
-        animate="show"
-        className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-      >
-        <AnimatePresence mode="popLayout">
-          {categoryItems.map((item) => (
-            <motion.div
-              key={item.Item_ID}
-              variants={{
-                hidden: { opacity: 0, y: 16 },
-                show: {
-                  opacity: 1,
-                  y: 0,
-                  transition: {
-                    type: 'spring',
-                    stiffness: 280,
-                    damping: 24,
-                  },
-                },
-              }}
-              className="h-full"
-            >
-              <ListingCard item={item} />
-            </motion.div>
+      {isLoadingCategory ? (
+        <div
+          role="status"
+          aria-label="Loading listings"
+          className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4"
+        >
+          {Array.from({ length: 8 }, (_, index) => (
+            <ListingCardSkeleton key={`category-skeleton-${index}`} />
           ))}
-        </AnimatePresence>
-      </motion.div>
-
-      {/* Empty Filter State */}
-      {categoryItems.length === 0 && (
-        isLoadingMarket && items.length === 0 ? (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }, (_, index) => <ListingCardSkeleton key={index} />)}
-          </div>
-        ) : <div className="rounded-3xl border border-dashed border-borderline bg-black/[0.01] py-16 text-center dark:bg-white/[0.01]">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2F6FED]/10 text-[#2F6FED] dark:text-[#4F8CFF]">
-            <SlidersHorizontal className="h-6 w-6" />
-          </div>
-          <h3 className="mt-4 font-display text-lg font-bold text-ink">
-            No listings found in {targetCategoryName}
-          </h3>
-          <p className="mt-1 text-sm text-ink-muted">
-            Try adjusting your budget range or clearing active search keywords.
-          </p>
-          <button
-            type="button"
-            onClick={handleClearFilters}
-            className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-borderline bg-surface px-4 py-2 text-xs font-semibold text-ink shadow-xs transition-colors hover:bg-surface-elevated cursor-pointer"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Reset category filters
-          </button>
         </div>
+      ) : listingFetchError ? (
+        <div role="alert" className="py-12 text-center text-status-danger">
+          <p className="text-lg font-medium">Listings could not be loaded.</p>
+          <p className="mt-2 text-sm">{listingFetchError}</p>
+        </div>
+      ) : categoryItems.length === 0 ? (
+        <div className="py-12 text-center text-slate-400">
+          <p className="text-lg font-medium">
+            No items found in this category yet.
+          </p>
+          <p className="mt-2 text-sm text-slate-500">
+            Be the first to post something in this category!
+          </p>
+        </div>
+      ) : (
+        <motion.div
+          key={`${currentSlug}-${maxBudget}-${sortBy}-${searchQuery}`}
+          variants={{
+            hidden: { opacity: 0 },
+            show: {
+              opacity: 1,
+              transition: { staggerChildren: 0.05 },
+            },
+          }}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4"
+        >
+          <AnimatePresence mode="popLayout">
+            {categoryItems.map((item) => (
+              <motion.div
+                key={item.Item_ID}
+                variants={{
+                  hidden: { opacity: 0, y: 16 },
+                  show: {
+                    opacity: 1,
+                    y: 0,
+                    transition: {
+                      type: 'spring',
+                      stiffness: 280,
+                      damping: 24,
+                    },
+                  },
+                }}
+                className="h-full"
+              >
+                <ListingCard item={item} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </motion.div>
       )}
 
       {/* Multi-Tier Footer */}

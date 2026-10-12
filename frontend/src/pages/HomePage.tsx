@@ -26,6 +26,14 @@ import { PAGE_VARIANTS } from '../lib/motion';
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'views';
 
+function conditionKey(value: string): string {
+  const key = value.toLowerCase().trim().replace(/[\s-]+/g, '_');
+  if (key === 'brand_new') return 'new';
+  if (key === 'fair_use') return 'fair';
+  if (key === 'books_&_notes' || key === 'books_and_notes') return 'used';
+  return key;
+}
+
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   'electronics-tech': Laptop,
   textbooks: BookOpen,
@@ -55,7 +63,7 @@ export default function HomePage() {
     void fetchListings({
       search: debouncedSearch || undefined,
       condition: conditionFilter || undefined,
-    });
+    }).catch(() => undefined);
   }, [conditionFilter, debouncedSearch, fetchListings]);
 
   const [sortBy, setSortBy] = useState<SortOption>('newest');
@@ -72,7 +80,7 @@ export default function HomePage() {
   const filteredItems = useMemo(() => {
     return items
       .filter((item) => item.Status === 'AVAILABLE')
-      .filter((item) => !conditionFilter || item.Condition.toLowerCase() === conditionFilter.toLowerCase())
+      .filter((item) => !conditionFilter || conditionKey(item.Condition) === conditionKey(conditionFilter))
       .filter((item) => {
         if (!searchQuery.trim()) return true;
         const q = searchQuery.toLowerCase();
@@ -124,20 +132,18 @@ export default function HomePage() {
         return {
           meta,
           totalAvailable: allAvailableInCat.length,
-          items: matchingFiltered,
+          items: matchingFiltered.slice(0, 4),
           hasMatches: matchingFiltered.length > 0,
         };
       });
   }, [categories, items, filteredItems]);
 
-  function handleCategoryPillClick(catName: string) {
+  function handleCategoryPillClick(catName: string, categorySlug?: string) {
     if (catName === 'All Categories' || catName === 'cat_all') {
-      // Stay on HomePage discovery preview
-      navigate('/');
+      navigate('/browse');
     } else {
-      // Direct navigation to dedicated /category/:categoryId full view
-      const slug = getCategorySlug(catName);
-      navigate(`/category/${slug}`);
+      const slug = categorySlug || getCategorySlug(catName);
+      navigate(`/browse?category=${encodeURIComponent(slug)}`);
     }
   }
 
@@ -210,7 +216,7 @@ export default function HomePage() {
               <button
                 key={cat.Category_ID}
                 type="button"
-                onClick={() => handleCategoryPillClick(cat.Name)}
+                onClick={() => handleCategoryPillClick(cat.Name, cat.Slug)}
                 className={`relative flex-shrink-0 rounded-2xl px-4 py-2 text-xs font-semibold tracking-tight transition-transform cursor-pointer ${
                   isAll
                     ? 'text-white dark:text-zinc-950'
@@ -249,11 +255,11 @@ export default function HomePage() {
             aria-label="Filter by condition"
             options={[
               { value: '', label: 'All conditions' },
-              { value: 'Brand New', label: 'Brand New' },
-              { value: 'Like New', label: 'Like New' },
+              { value: 'new', label: 'New' },
+              { value: 'like_new', label: 'Like New' },
               { value: 'good', label: 'Good' },
-              { value: 'Fair Use', label: 'Fair Use' },
-              { value: 'books & notes', label: 'Books & Notes' },
+              { value: 'fair', label: 'Fair' },
+              { value: 'used', label: 'Used' },
             ]}
           />
 
@@ -300,7 +306,7 @@ export default function HomePage() {
           ═══════════════════════════════════════════════════════════════ */}
       <div className="min-h-screen space-y-12 pb-16">
         {categorySections.map(({ meta, totalAvailable, items: catItems, hasMatches }) => {
-          if (!hasMatches) return null;
+          if (!hasMatches && !isLoadingMarket) return null;
           const Icon = CATEGORY_ICONS[meta.slug] || Layers;
 
           return (
@@ -325,7 +331,15 @@ export default function HomePage() {
 
                 <button
                   type="button"
-                  onClick={() => navigate(`/category/${meta.slug}`)}
+                  onClick={() => {
+                    const category = categories.find(
+                      (candidate) =>
+                        candidate.Name.toLowerCase() === meta.name.toLowerCase() ||
+                        candidate.Category_ID === meta.id
+                    );
+                    const slug = category?.Slug || meta.slug;
+                    navigate(`/browse?category=${encodeURIComponent(slug)}`);
+                  }}
                   className="group inline-flex items-center gap-1.5 text-xs font-semibold text-[#2F6FED] hover:text-[#1A54D4] dark:text-[#4F8CFF] dark:hover:text-[#70A5FF] transition-colors cursor-pointer"
                 >
                   <span>View all in {meta.name}</span>
@@ -333,12 +347,19 @@ export default function HomePage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {catItems.map((item) => (
-                  <div key={item.Item_ID} className="h-full">
-                    <ListingCard item={item} />
-                  </div>
-                ))}
+              <div
+                aria-busy={isLoadingMarket && !hasMatches}
+                className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
+              >
+                {hasMatches
+                  ? catItems.map((item) => (
+                      <div key={item.Item_ID} className="h-full">
+                        <ListingCard item={item} />
+                      </div>
+                    ))
+                  : Array.from({ length: 4 }, (_, index) => (
+                      <ListingCardSkeleton key={`${meta.id}-skeleton-${index}`} />
+                    ))}
               </div>
             </section>
           );
@@ -347,7 +368,7 @@ export default function HomePage() {
 
       {/* Empty Filter State (if no categories match criteria) */}
       {!hasAnyMatches && (
-        isLoadingMarket && items.length === 0 ? (
+        isLoadingMarket && categories.length === 0 ? (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: 4 }, (_, index) => <ListingCardSkeleton key={index} />)}
           </div>

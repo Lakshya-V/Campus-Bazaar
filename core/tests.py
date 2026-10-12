@@ -49,6 +49,29 @@ class ListingApiTests(APITestCase):
 		})
 		self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+	def test_listings_can_be_filtered_by_category_slug_or_id(self):
+		appliances = Category.objects.create(name='Appliances', slug='appliances')
+		Listing.objects.create(
+			seller=self.seller, category=self.category, title='Textbook',
+			description='Books listing', price=Decimal('10.00'), condition='good',
+		)
+		Listing.objects.create(
+			seller=self.seller, category=appliances, title='Kettle',
+			description='Appliance listing', price=Decimal('15.00'), condition='good',
+		)
+
+		response = self.client.get(reverse('listing-list'), {'category': 'appliances'})
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(len(response.data), 1)
+		self.assertEqual(response.data[0]['category']['slug'], 'appliances')
+
+		response = self.client.get(
+			reverse('listing-list'), {'category': str(self.category.id)}
+		)
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(len(response.data), 1)
+		self.assertEqual(response.data[0]['category']['slug'], 'books')
+
 	def test_authenticated_user_creates_listing_with_image_url(self):
 		self.client.force_authenticate(self.seller)
 		response = self.client.post(reverse('listing-list'), {
@@ -593,3 +616,145 @@ class RatingApiTests(APITestCase):
             'comment': '',
         })
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_seller_cannot_rate_as_the_buyer(self):
+        self.client.force_authenticate(self.seller)
+        response = self.client.post(reverse('rating-list'), {
+            'conversation': self.conversation.id,
+            'score': 5,
+            'comment': '',
+        })
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Rating.objects.exists())
+
+    def test_buyer_cannot_rate_before_listing_is_sold(self):
+        self.listing.status = Listing.Status.AVAILABLE
+        self.listing.save(update_fields=['status'])
+        self.client.force_authenticate(self.buyer)
+        response = self.client.post(reverse('rating-list'), {
+            'conversation': self.conversation.id,
+            'score': 5,
+            'comment': '',
+        })
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Rating.objects.exists())
+
+
+class EnhancedFlowsTests(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = CustomUser.objects.create_user(
+            username='student1', university_email='student1@vitstudent.ac.in',
+            email='student1@vitstudent.ac.in', password='initial-password123',
+            is_verified_student=True,
+        )
+        self.category = Category.objects.create(name='Books', slug='books')
+        self.listing = Listing.objects.create(
+            seller=self.user, category=self.category, title='Algorithm Design',
+            description='Textbook', price=Decimal('45.00'), condition='good',
+        )
+
+    def test_listing_views_counter_increments_atomically(self):
+        self.assertEqual(self.listing.views_count, 0)
+        url = reverse('listing-detail', args=[self.listing.id])
+
+        res1 = self.client.get(url)
+        self.assertEqual(res1.status_code, status.HTTP_200_OK)
+        self.assertEqual(res1.data['views_count'], 1)
+
+        res2 = self.client.get(url)
+        self.assertEqual(res2.status_code, status.HTTP_200_OK)
+        self.assertEqual(res2.data['views_count'], 2)
+
+        self.listing.refresh_from_db()
+        self.assertEqual(self.listing.views_count, 2)
+
+    def test_password_reset_flow(self):
+        # 1. Request password reset
+        req_url = reverse('password_reset_request')
+        res1 = self.client.post(req_url, {'email': 'student1@vitstudent.ac.in'})
+        self.assertEqual(res1.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('Your Campus Bazaar Password Reset Code', mail.outbox[0].subject)
+
+        # Retrieve user and verify hash and expiry
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.password_reset_code_hash)
+        self.assertIsNotNone(self.user.password_reset_expires_at)
+
+        # Extract 6-digit OTP code from mail body
+        import re
+        otp_match = re.search(r'\b\d{6}\b', mail.outbox[0].body)
+        self.assertIsNotNone(otp_match)
+        code = otp_match.group(0)
+
+        # 2. Confirm password reset
+        confirm_url = reverse('password_reset_confirm')
+        res2 = self.client.post(confirm_url, {
+            'email': 'student1@vitstudent.ac.in',
+            'code': code,
+            'new_password': 'NewPassword456!',
+        })
+        self.assertEqual(res2.status_code, status.HTTP_200_OK)
+
+        # 3. Verify user can log in with new password
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('NewPassword456!'))
+        self.assertIsNone(self.user.password_reset_code_hash)
+
+        login_res = self.client.post(reverse('token_obtain_pair'), {
+            'username': 'student1@vitstudent.ac.in',
+            'password': 'NewPassword456!',
+        })
+        self.assertEqual(login_res.status_code, status.HTTP_200_OK)
+        self.assertIn('access', login_res.data)
+
+    def test_password_reset_code_is_invalidated_after_five_failed_attempts(self):
+        request_url = reverse('password_reset_request')
+        response = self.client.post(request_url, {'email': 'student1@vitstudent.ac.in'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        import re
+        sent_code = re.search(r'\b\d{6}\b', mail.outbox[-1].body)
+        self.assertIsNotNone(sent_code)
+        wrong_code = '000000' if sent_code.group(0) != '000000' else '000001'
+
+        confirm_url = reverse('password_reset_confirm')
+        for attempt in range(5):
+            response = self.client.post(confirm_url, {
+                'email': 'student1@vitstudent.ac.in',
+                'code': wrong_code,
+                'new_password': 'NewPassword456!',
+            })
+            expected_status = (
+                status.HTTP_429_TOO_MANY_REQUESTS if attempt == 4
+                else status.HTTP_400_BAD_REQUEST
+            )
+            self.assertEqual(response.status_code, expected_status)
+
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.password_reset_code_hash)
+        self.assertIsNone(self.user.password_reset_expires_at)
+
+    def test_condition_choices_and_category_sync(self):
+        self.client.force_authenticate(self.user)
+        for cond_key in ['new', 'like_new', 'good', 'fair', 'used']:
+            res = self.client.post(reverse('listing-list'), {
+                'title': f'Item {cond_key}',
+                'description': 'Details',
+                'price': '10.00',
+                'condition': cond_key,
+                'category': 'hostel',
+            })
+            self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+            self.assertEqual(res.data['condition'], cond_key)
+            self.assertEqual(res.data['category']['slug'], 'hostel')
+
+        invalid_response = self.client.post(reverse('listing-list'), {
+            'title': 'Invalid condition',
+            'description': 'Details',
+            'price': '10.00',
+            'condition': 'excellent',
+            'category': 'hostel',
+        })
+        self.assertEqual(invalid_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('condition', invalid_response.data)

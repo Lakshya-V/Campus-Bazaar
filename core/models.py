@@ -14,16 +14,28 @@ class CustomUser(AbstractUser):
     graduation_year = models.IntegerField(null=True, blank=True)
     phone_number = models.CharField(max_length=15, blank=True)
     is_verified_student = models.BooleanField(default=False)
-    otp_code = models.CharField(max_length=6, blank=True, null=True)
-    otp_created_at = models.DateTimeField(blank=True, null=True)
+    password_reset_code_hash = models.CharField(max_length=255, null=True, blank=True)
+    password_reset_attempts = models.IntegerField(default=0)
+    password_reset_expires_at = models.DateTimeField(null=True, blank=True)
+    otp_code = models.CharField(max_length=6, null=True, blank=True)
+    otp_created_at = models.DateTimeField(null=True, blank=True)
 
     @property
     def rating_average(self):
-        return self.received_reviews.aggregate(average=Avg('score'))['average'] or 0
+        if self.received_reviews.exists():
+            avg = self.received_reviews.aggregate(average=Avg('score'))['average']
+            return round(avg, 1) if avg is not None else 0
+        if self.received_buyer_reviews.exists():
+            avg = self.received_buyer_reviews.aggregate(average=Avg('rating'))['average']
+            return round(avg, 1) if avg is not None else 0
+        return 0
 
     @property
     def rating_count(self):
-        return self.received_reviews.count()
+        cnt = self.received_reviews.count()
+        if cnt > 0:
+            return cnt
+        return self.received_buyer_reviews.count()
 
     def __str__(self):
         return f"{self.username} ({self.university_email})"
@@ -41,12 +53,29 @@ class Category(models.Model):
 
 
 class Listing(models.Model):
+    CATEGORY_CHOICES = [
+        ('books', 'Books'),
+        ('electronics', 'Electronics'),
+        ('cycles', 'Cycles'),
+        ('clothing', 'Clothing'),
+        ('hostel', 'Hostel Essentials'),
+        ('others', 'Others'),
+    ]
+
+    CONDITION_CHOICES = [
+        ('new', 'New'),
+        ('like_new', 'Like New'),
+        ('good', 'Good'),
+        ('fair', 'Fair'),
+        ('used', 'Used'),
+    ]
+
     class Condition(models.TextChoices):
-        NEW = 'Brand New', 'Brand New'
-        LIKE_NEW = 'Like New', 'Like New'
-        GOOD = 'Good', 'Good'
-        FAIR = 'Fair Use', 'Fair Use'
-        BOOKS_NOTES = 'Books & Notes', 'Books & Notes'
+        NEW = 'new', 'New'
+        LIKE_NEW = 'like_new', 'Like New'
+        GOOD = 'good', 'Good'
+        FAIR = 'fair', 'Fair'
+        USED = 'used', 'Used'
 
     class Status(models.TextChoices):
         AVAILABLE = 'AVAILABLE', 'Available'
@@ -57,9 +86,10 @@ class Listing(models.Model):
     title = models.CharField(max_length=150)
     description = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    condition = models.CharField(max_length=20, choices=Condition.choices)
+    condition = models.CharField(max_length=20, choices=CONDITION_CHOICES, default='good')
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.AVAILABLE)
     image_url = models.URLField(blank=True)
+    views_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -146,6 +176,33 @@ class Rating(models.Model):
 
     def __str__(self):
         return f'{self.rater} rated {self.rated_user}: {self.score}/5'
+
+
+class Review(models.Model):
+    buyer = models.ForeignKey(
+        CustomUser, on_delete=models.CASCADE, related_name='buyer_reviews'
+    )
+    seller = models.ForeignKey(
+        CustomUser, on_delete=models.CASCADE, related_name='received_buyer_reviews'
+    )
+    listing = models.ForeignKey(
+        Listing, on_delete=models.CASCADE, related_name='reviews', null=True, blank=True
+    )
+    rating = models.PositiveSmallIntegerField()
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(rating__gte=1, rating__lte=5),
+                name='review_rating_between_one_and_five',
+            ),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.buyer} reviewed {self.seller}: {self.rating}/5'
 
 
 class Notification(models.Model):

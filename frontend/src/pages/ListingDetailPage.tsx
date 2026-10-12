@@ -1,5 +1,5 @@
 // src/pages/ListingDetailPage.tsx
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -13,6 +13,7 @@ import {
   Edit3,
   ChevronLeft,
   ChevronRight,
+  X,
 } from 'lucide-react';
 import { useMarket } from '../context/MarketContext';
 import { useAuth } from '../context/AuthContext';
@@ -29,9 +30,12 @@ const CONDITION_STYLES: Record<ListingCondition, string> = {
   Good: 'bg-[#2F6FED] text-white dark:bg-[#2F6FED] dark:text-[#0D0F12]',
   'Fair Use': 'bg-[#E0912B] text-white dark:bg-[#E0912B] dark:text-[#0D0F12]',
   'Books & Notes': 'bg-[#7C5CE7] text-white dark:bg-[#7C5CE7] dark:text-[#0D0F12]',
+  Used: 'bg-[#7C5CE7] text-white dark:bg-[#7C5CE7] dark:text-[#0D0F12]',
   new: 'bg-[#1AA260] text-white dark:bg-[#1AA260] dark:text-[#0D0F12]',
+  like_new: 'bg-[#2F6FED] text-white dark:bg-[#2F6FED] dark:text-[#0D0F12]',
   good: 'bg-[#2F6FED] text-white dark:bg-[#2F6FED] dark:text-[#0D0F12]',
   fair: 'bg-[#E0912B] text-white dark:bg-[#E0912B] dark:text-[#0D0F12]',
+  used: 'bg-[#7C5CE7] text-white dark:bg-[#7C5CE7] dark:text-[#0D0F12]',
 };
 
 export default function ListingDetailPage() {
@@ -52,11 +56,25 @@ export default function ListingDetailPage() {
   } = useMarket();
 
   const item = getItem(id || '');
+  const [viewCountOverride, setViewCountOverride] = useState<{
+    listingId: string;
+    count: number;
+  } | null>(null);
+  const liveViews =
+    viewCountOverride && viewCountOverride.listingId === id
+      ? viewCountOverride.count
+      : item?.ViewCount ?? 0;
+  const viewedListingId = useRef<string | null>(null);
 
   // Increment view count on mount & record to recently viewed
   useEffect(() => {
-    if (id) {
-      incrementItemView();
+    if (id && viewedListingId.current !== id) {
+      viewedListingId.current = id;
+      void incrementItemView(id)
+        .then((count) => setViewCountOverride({ listingId: id, count }))
+        .catch((error: unknown) => {
+          console.error('Could not increment listing view count:', error);
+        });
       recordViewedItem(id);
     }
   }, [id, incrementItemView, recordViewedItem]);
@@ -65,6 +83,7 @@ export default function ListingDetailPage() {
   const [dealClosedStamp, setDealClosedStamp] = useState(false);
   const [isStartingChat, setIsStartingChat] = useState(false);
   const [showEditStubModal, setShowEditStubModal] = useState(false);
+  const [showLightbox, setShowLightbox] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [prevId, setPrevId] = useState(id);
 
@@ -174,7 +193,8 @@ export default function ListingDetailPage() {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.2 }}
-                  className={`h-full w-full object-cover transition-all duration-300 ${
+                  onClick={() => setShowLightbox(true)}
+                  className={`h-full w-full object-contain bg-slate-900/60 rounded-2xl cursor-pointer transition-all duration-300 ${
                     isSold ? 'grayscale contrast-125 opacity-70' : ''
                   }`}
                 />
@@ -286,7 +306,7 @@ export default function ListingDetailPage() {
               </span>
               <span className="ml-auto flex items-center gap-1 text-[10px] uppercase tracking-wider text-ink-muted">
                 <Eye className="h-3 w-3" />
-                {item.ViewCount} views
+                {liveViews} views
               </span>
             </div>
 
@@ -439,6 +459,7 @@ export default function ListingDetailPage() {
                   >
                     <Heart className={`h-5 w-5 ${isFav ? 'fill-current' : ''}`} />
                   </motion.button>
+
                 </div>
               )}
             </div>
@@ -595,6 +616,39 @@ export default function ListingDetailPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* FULLSCREEN LIGHTBOX MODAL */}
+      <AnimatePresence>
+        {showLightbox && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
+            onClick={() => setShowLightbox(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="relative max-h-[90vh] max-w-[90vw]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={item.Images[activeImageIndex] || item.Images[0]}
+                alt={item.Title}
+                className="max-h-[85vh] max-w-[85vw] rounded-2xl object-contain shadow-2xl"
+              />
+              <button
+                type="button"
+                onClick={() => setShowLightbox(false)}
+                className="absolute -top-3 -right-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-md hover:bg-white/40 transition-colors"
+                title="Close fullscreen preview"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </motion.div>
   );
 }

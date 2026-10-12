@@ -28,6 +28,8 @@ interface AuthContextValue {
   signup: (name: string, email: string, password: string) => Promise<void>;
   sendVerificationCode: (email: string) => Promise<void>;
   verifyEmail: (email: string, otpCode: string, password: string) => Promise<boolean>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  confirmPasswordReset: (email: string, code: string, newPassword: string) => Promise<void>;
   switchUser: (userId: string) => void;
   logout: () => Promise<void>;
   demoUsers: User[];
@@ -193,6 +195,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [login]
   );
 
+  const requestPasswordReset = useCallback(async (email: string): Promise<void> => {
+    setIsLoading(true);
+    try {
+      if (!/^[^\s@]+@vitstudent\.ac\.in$/i.test(email.trim())) {
+        throw new Error('Use your @vitstudent.ac.in email address.');
+      }
+      await axiosInstance.post('/auth/password-reset-request/', {
+        email: email.trim().toLowerCase(),
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const confirmPasswordReset = useCallback(
+    async (email: string, code: string, newPassword: string): Promise<void> => {
+      setIsLoading(true);
+      try {
+        await axiosInstance.post('/auth/password-reset-confirm/', {
+          email: email.trim().toLowerCase(),
+          code: code.trim(),
+          new_password: newPassword,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
   const switchUser = useCallback((userId: string) => {
     const target = INITIAL_USERS.find((candidate) => candidate.User_ID === userId);
     if (target) setUser(target);
@@ -218,11 +250,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signup,
       sendVerificationCode,
       verifyEmail,
+      requestPasswordReset,
+      confirmPasswordReset,
       switchUser,
       logout,
       demoUsers: INITIAL_USERS,
     }),
-    [user, accessToken, refreshToken, isLoading, login, signup, sendVerificationCode, verifyEmail, switchUser, logout]
+    [
+      user,
+      accessToken,
+      refreshToken,
+      isLoading,
+      login,
+      signup,
+      sendVerificationCode,
+      verifyEmail,
+      requestPasswordReset,
+      confirmPasswordReset,
+      switchUser,
+      logout,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

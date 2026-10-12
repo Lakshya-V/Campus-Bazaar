@@ -1,8 +1,11 @@
 import secrets
 from datetime import timedelta
 
+from django.contrib.auth.hashers import check_password, make_password
 from django.core.mail import send_mail
-from django.db.models import Q
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import F, Q
 from django.db import transaction
 from django.utils import timezone
 
@@ -28,6 +31,8 @@ from .serializers import (
     ListingSerializer,
     MessageSerializer,
     NotificationSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
     RatingSerializer,
     UserRegistrationSerializer,
     UserProfileSerializer,
@@ -134,6 +139,119 @@ class VerifyEmailOTPView(APIView):
         return Response({'detail': 'Email verified.', 'is_verified_student': True})
 
 
+class PasswordResetRequestView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        payload = request.data.copy()
+        if 'email' not in payload and 'university_email' in payload:
+            payload['email'] = payload['university_email']
+        serializer = PasswordResetRequestSerializer(data=payload)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+
+        user = CustomUser.objects.filter(university_email__iexact=email).first() or \
+               CustomUser.objects.filter(email__iexact=email).first()
+        if not user:
+            return Response({'detail': 'No user found with this email address.'}, status=status.HTTP_404_NOT_FOUND)
+
+        code = f'{secrets.randbelow(1_000_000):06d}'
+        user.password_reset_code_hash = make_password(code)
+        user.password_reset_expires_at = timezone.now() + timedelta(minutes=15)
+        user.password_reset_attempts = 0
+        user.save(update_fields=['password_reset_code_hash', 'password_reset_expires_at', 'password_reset_attempts'])
+
+        send_mail(
+            subject='Your Campus Bazaar Password Reset Code',
+            message=f'Your password reset verification code is: {code}\nThis code will expire in 15 minutes.',
+            from_email=None,
+            recipient_list=[user.university_email or user.email],
+            fail_silently=False,
+        )
+        return Response({'detail': 'Password reset code sent to email.'}, status=status.HTTP_200_OK)
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        payload = request.data.copy()
+        if 'email' not in payload and 'university_email' in payload:
+            payload['email'] = payload['university_email']
+        if 'code' not in payload and 'otp' in payload:
+            payload['code'] = payload['otp']
+        if 'new_password' not in payload and 'password' in payload:
+            payload['new_password'] = payload['password']
+        serializer = PasswordResetConfirmSerializer(data=payload)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+        code = serializer.validated_data['code']
+        new_password = serializer.validated_data['new_password']
+
+        user = CustomUser.objects.filter(university_email__iexact=email).first() or \
+               CustomUser.objects.filter(email__iexact=email).first()
+        if not user:
+            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not user.password_reset_code_hash or not user.password_reset_expires_at:
+            return Response(
+                {'detail': 'No active password reset request found. Please request a new code.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if user.password_reset_attempts >= 5:
+            user.password_reset_code_hash = None
+            user.password_reset_expires_at = None
+            user.save(update_fields=['password_reset_code_hash', 'password_reset_expires_at'])
+            return Response(
+                {'detail': 'Too many incorrect codes. Please request a new code.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        if timezone.now() > user.password_reset_expires_at:
+            user.password_reset_code_hash = None
+            user.password_reset_expires_at = None
+            user.save(update_fields=['password_reset_code_hash', 'password_reset_expires_at'])
+            return Response(
+                {'detail': 'Password reset code has expired. Please request a new code.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not check_password(code, user.password_reset_code_hash):
+            user.password_reset_attempts += 1
+            update_fields = ['password_reset_attempts']
+            if user.password_reset_attempts >= 5:
+                user.password_reset_code_hash = None
+                user.password_reset_expires_at = None
+                update_fields.extend(['password_reset_code_hash', 'password_reset_expires_at'])
+            user.save(update_fields=update_fields)
+            if user.password_reset_attempts >= 5:
+                return Response(
+                    {'detail': 'Too many incorrect codes. Please request a new code.'},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
+            return Response(
+                {'detail': 'Invalid verification code.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as exc:
+            raise ValidationError({'new_password': list(exc.messages)}) from exc
+
+        user.set_password(new_password)
+        user.password_reset_code_hash = None
+        user.password_reset_expires_at = None
+        user.password_reset_attempts = 0
+        user.save(update_fields=['password', 'password_reset_code_hash', 'password_reset_expires_at', 'password_reset_attempts'])
+
+        return Response(
+            {'detail': 'Password has been reset successfully. You can now log in.'},
+            status=status.HTTP_200_OK,
+        )
+
+
 class UserProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -159,11 +277,17 @@ class ListingViewSet(ModelViewSet):
     parser_classes = (MultiPartParser, FormParser)
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    filterset_fields = ['category', 'condition', 'status']
+    filterset_fields = ['condition', 'status']
     search_fields = ['title', 'description']
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        category = self.request.query_params.get('category')
+        if category:
+            if category.isdecimal():
+                queryset = queryset.filter(category_id=int(category))
+            else:
+                queryset = queryset.filter(category__slug__iexact=category)
         min_price = self.request.query_params.get('min_price')
         max_price = self.request.query_params.get('max_price')
         if min_price:
@@ -174,6 +298,13 @@ class ListingViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(seller=self.request.user)
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        Listing.objects.filter(pk=instance.pk).update(views_count=F('views_count') + 1)
+        instance.refresh_from_db(fields=['views_count'])
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
 
 class ConversationViewSet(ModelViewSet):

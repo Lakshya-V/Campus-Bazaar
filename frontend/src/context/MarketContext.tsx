@@ -72,6 +72,7 @@ interface ApiListing {
   status: string;
   image_url: string;
   is_favorited?: boolean;
+  views_count?: number;
   created_at: string;
 }
 
@@ -152,12 +153,14 @@ interface MarketContextValue {
   getUser: (userId: string) => User | undefined;
   items: Item[];
   isLoadingMarket: boolean;
+  isLoadingListings: boolean;
+  listingFetchError: string | null;
   fetchListings: (filters?: ListingFilters) => Promise<void>;
   getItem: (itemId: string) => Item | undefined;
   addItem: (input: NewItemInput) => Promise<Item>;
   markItemSold: (itemId: string, winningBuyerId?: string) => Promise<void>;
   toggleItemStatus: (itemId: string) => Promise<void>;
-  incrementItemView: () => void;
+  incrementItemView: (itemId: string) => Promise<number>;
   categories: Category[];
   wishlist: WishlistItem[];
   toggleWishlist: (itemId: string) => Promise<void>;
@@ -200,12 +203,19 @@ function normalizeImageUrl(imageUrl?: string): string | undefined {
 }
 
 function normalizeCondition(value: string): ListingCondition {
-  const condition = (value || '').toLowerCase();
-  if (condition.includes('book') || condition.includes('note')) return 'Books & Notes';
-  if (condition.includes('like')) return 'Like New';
-  if (condition.includes('new')) return 'Brand New';
-  if (condition.includes('fair')) return 'Fair Use';
-  return 'Good';
+  const condition = (value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const labels: Record<string, ListingCondition> = {
+    brand_new: 'Brand New',
+    new: 'Brand New',
+    like_new: 'Like New',
+    good: 'Good',
+    fair: 'Fair Use',
+    fair_use: 'Fair Use',
+    used: 'Used',
+    books_and_notes: 'Used',
+    'books_&_notes': 'Used',
+  };
+  return labels[condition] ?? 'Good';
 }
 
 function toUserFromApi(apiUser: ApiUser): User {
@@ -236,6 +246,8 @@ export function MarketProvider({ children }: { children: ReactNode }) {
   const [ratings, setRatings] = useState<Rating[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoadingMarket, setIsLoadingMarket] = useState(false);
+  const [isLoadingListings, setIsLoadingListings] = useState(false);
+  const [listingFetchError, setListingFetchError] = useState<string | null>(null);
   const [loadingMessagesFor, setLoadingMessagesFor] = useState<string | null>(null);
 
   const categoryById = useMemo(
@@ -277,7 +289,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
         Images: imageUrl ? [imageUrl] : [],
         Description: listing.description,
         PostedAt: listing.created_at,
-        ViewCount: 0,
+        ViewCount: Number(listing.views_count ?? 0),
         IsFavorited: listing.is_favorited,
       };
     },
@@ -448,22 +460,33 @@ export function MarketProvider({ children }: { children: ReactNode }) {
 
   const fetchListings = useCallback(
     async (filters: ListingFilters = {}) => {
-      const params: Record<string, string> = {};
-      if (filters.search) params.search = filters.search;
-      if (filters.category) params.category = filters.category;
-      if (filters.condition) {
-        const value = filters.condition.toLowerCase();
-        params.condition =
-          value === 'new' || value === 'brand new' ? 'Brand New' :
-          value === 'like new' ? 'Like New' :
-          value === 'fair' ? 'Fair Use' :
-          value === 'books & notes' ? 'Books & Notes' : 'Good';
+      setIsLoadingListings(true);
+      setListingFetchError(null);
+      try {
+        const params: Record<string, string> = {};
+        if (filters.search) params.search = filters.search;
+        if (filters.category) params.category = filters.category;
+        if (filters.condition) {
+          const value = filters.condition.toLowerCase().trim().replace(/[\s-]+/g, '_');
+          params.condition =
+            value === 'brand_new' ? 'new' :
+            value === 'fair_use' ? 'fair' :
+            value === 'books_&_notes' || value === 'books_and_notes' ? 'used' :
+            value;
+        }
+        const { data } = await axiosInstance.get<ApiListing[] | { results: ApiListing[] }>('/listings/', {
+          params,
+        });
+        const raw = listData(data);
+        setItems(raw.map(toItem));
+      } catch (error) {
+        setListingFetchError(
+          error instanceof Error ? error.message : 'Could not load listings. Please try again.'
+        );
+        throw error;
+      } finally {
+        setIsLoadingListings(false);
       }
-      const { data } = await axiosInstance.get<ApiListing[] | { results: ApiListing[] }>('/listings/', {
-        params,
-      });
-      const raw = listData(data);
-      setItems(raw.map(toItem));
     },
     [toItem]
   );
@@ -486,6 +509,8 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       setRatings([]);
       setNotifications([]);
       setIsLoadingMarket(false);
+      setIsLoadingListings(false);
+      setListingFetchError(null);
     };
     window.addEventListener(AUTH_LOGOUT_EVENT, clearPrivateMarketState);
     return () => window.removeEventListener(AUTH_LOGOUT_EVENT, clearPrivateMarketState);
@@ -513,18 +538,19 @@ export function MarketProvider({ children }: { children: ReactNode }) {
       const category = categories.find(
         (candidate) =>
           candidate.Name.toLowerCase() === input.Category.toLowerCase() ||
-          candidate.Category_ID === input.Category
+          candidate.Category_ID === input.Category ||
+          candidate.Slug?.toLowerCase() === input.Category.toLowerCase()
       );
-      if (!category || !/^\d+$/.test(category.Category_ID)) {
-        throw new Error('Choose a category before publishing the listing.');
-      }
 
       const formData = new FormData();
       formData.append('title', input.Title.trim());
       formData.append('description', input.Description.trim());
       formData.append('price', String(input.Price));
       formData.append('condition', input.Condition);
-      formData.append('category_id', String(Number(category.Category_ID)));
+      formData.append('category', input.Category);
+      if (category && /^\d+$/.test(category.Category_ID)) {
+        formData.append('category_id', String(Number(category.Category_ID)));
+      }
       if (input.Image) formData.append('image', input.Image);
       const { data } = await axiosInstance.post<ApiListing>('/listings/', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -571,7 +597,17 @@ export function MarketProvider({ children }: { children: ReactNode }) {
     }
   }, [items]);
 
-  const incrementItemView = useCallback(() => undefined, []);
+  const incrementItemView = useCallback(
+    async (itemId: string): Promise<number> => {
+      const { data } = await axiosInstance.get<ApiListing>(`/listings/${itemId}/`);
+      const updated = toItem(data);
+      setItems((previous) =>
+        previous.map((item) => (item.Item_ID === itemId ? updated : item))
+      );
+      return updated.ViewCount;
+    },
+    [toItem]
+  );
   const recordViewedItem = useCallback((itemId: string) => {
     setRecentlyViewedIds((previous) =>
       [itemId, ...previous.filter((id) => id !== itemId)].slice(0, 10)
@@ -840,7 +876,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<MarketContextValue>(() => ({
-    users, getUser, items, isLoadingMarket, fetchListings, getItem, addItem, markItemSold, toggleItemStatus, incrementItemView,
+    users, getUser, items, isLoadingMarket, isLoadingListings, listingFetchError, fetchListings, getItem, addItem, markItemSold, toggleItemStatus, incrementItemView,
     categories, wishlist, toggleWishlist, isWishlisted,
     recentlyViewedIds, recordViewedItem, chatSessions, messages,
     getSessionsForUser, getSessionById, getMessagesForSession, fetchSessionMessages, loadingMessagesFor, startChatSession,
@@ -849,7 +885,7 @@ export function MarketProvider({ children }: { children: ReactNode }) {
     unreadNotificationCount: notifications.filter((notification) => notification.unread).length,
     markNotificationsRead,
   }), [
-    users, getUser, items, isLoadingMarket, fetchListings, getItem, addItem, markItemSold, toggleItemStatus, incrementItemView,
+    users, getUser, items, isLoadingMarket, isLoadingListings, listingFetchError, fetchListings, getItem, addItem, markItemSold, toggleItemStatus, incrementItemView,
     categories, wishlist, toggleWishlist, isWishlisted,
     recentlyViewedIds, recordViewedItem, chatSessions, messages,
     getSessionsForUser, getSessionById, getMessagesForSession, fetchSessionMessages, loadingMessagesFor, startChatSession,

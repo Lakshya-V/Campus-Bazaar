@@ -14,6 +14,8 @@ from .views import (
     UserProfileView,
     VerifyEmailOTPView,
     EmailTokenObtainPairView,
+    PasswordResetRequestView,
+    PasswordResetConfirmView,
 )
 
 router = DefaultRouter()
@@ -30,6 +32,8 @@ urlpatterns = [
     path('auth/register/', RegisterView.as_view(), name='register'),
     path('auth/send-otp/', SendEmailOTPView.as_view(), name='send-otp'),
     path('auth/verify-otp/', VerifyEmailOTPView.as_view(), name='verify-otp'),
+    path('auth/password-reset-request/', PasswordResetRequestView.as_view(), name='password_reset_request'),
+    path('auth/password-reset-confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('auth/login/', EmailTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/profile/', UserProfileView.as_view(), name='profile'),

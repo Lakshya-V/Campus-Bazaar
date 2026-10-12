@@ -8,9 +8,12 @@ export type ListingCondition =
   | 'Good'
   | 'Fair Use'
   | 'Books & Notes'
+  | 'Used'
   | 'new'
+  | 'like_new'
   | 'good'
-  | 'fair';
+  | 'fair'
+  | 'used';
 export type ItemStatus = 'AVAILABLE' | 'SOLD';
 
 export interface User {

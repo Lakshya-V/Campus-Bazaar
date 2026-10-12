@@ -3,11 +3,12 @@ import logging
 
 from django.core.validators import RegexValidator
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import (
-    Category, Conversation, CustomUser, Favorite, Listing, Message, Notification, Rating,
+    Category, Conversation, CustomUser, Favorite, Listing, Message, Notification, Rating, Review,
 )
 from .utils import upload_chat_attachment, upload_listing_image
 
@@ -112,14 +113,15 @@ class ListingSerializer(serializers.ModelSerializer):
         queryset=Category.objects.all(), source='category', write_only=True
     )
     is_favorited = serializers.SerializerMethodField()
+    views_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Listing
         fields = [
             'id', 'seller', 'seller_id', 'category', 'category_id', 'title', 'description', 'price',
-            'condition', 'status', 'image_url', 'image', 'is_favorited', 'created_at',
+            'condition', 'status', 'image_url', 'image', 'is_favorited', 'views_count', 'created_at',
         ]
-        read_only_fields = ['id', 'seller', 'seller_id', 'is_favorited', 'created_at']
+        read_only_fields = ['id', 'seller', 'seller_id', 'is_favorited', 'views_count', 'created_at']
 
     def get_is_favorited(self, obj):
         request = self.context.get('request')
@@ -128,38 +130,46 @@ class ListingSerializer(serializers.ModelSerializer):
         return False
 
     def validate_condition(self, value):
-        if not value:
-            return Listing.Condition.GOOD
-        val_lower = str(value).strip().lower()
-        if 'book' in val_lower or 'note' in val_lower:
-            return Listing.Condition.BOOKS_NOTES
-        if 'like' in val_lower:
-            return Listing.Condition.LIKE_NEW
-        if 'new' in val_lower:
-            return Listing.Condition.NEW
-        if 'fair' in val_lower:
-            return Listing.Condition.FAIR
-        return Listing.Condition.GOOD
+        return value
 
     def to_internal_value(self, data):
         mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
         if 'condition' in mutable_data:
-            cond = str(mutable_data['condition']).strip().lower()
-            if 'book' in cond or 'note' in cond:
-                mutable_data['condition'] = Listing.Condition.BOOKS_NOTES
-            elif 'like' in cond:
-                mutable_data['condition'] = Listing.Condition.LIKE_NEW
-            elif 'new' in cond:
-                mutable_data['condition'] = Listing.Condition.NEW
-            elif 'fair' in cond:
-                mutable_data['condition'] = Listing.Condition.FAIR
+            cond = str(mutable_data['condition']).strip().lower().replace('-', '_').replace(' ', '_')
+            valid_keys = [c[0] for c in Listing.CONDITION_CHOICES]
+            if cond in valid_keys:
+                mutable_data['condition'] = cond
             else:
-                mutable_data['condition'] = Listing.Condition.GOOD
-        if 'category' in mutable_data and 'category_id' not in mutable_data:
-            cat_val = mutable_data.get('category')
-            if isinstance(cat_val, (int, str)) and str(cat_val).isdigit():
+                legacy_values = {
+                    'brand_new': 'new',
+                    'like_new': 'like_new',
+                    'fair_use': 'fair',
+                    'books_notes': 'used',
+                    'books_&_notes': 'used',
+                    'books_and_notes': 'used',
+                }
+                mutable_data['condition'] = legacy_values.get(cond, cond)
+
+        cat_val = mutable_data.get('category') or mutable_data.get('category_id')
+        if cat_val is not None and 'category_id' not in mutable_data:
+            if isinstance(cat_val, int) or (isinstance(cat_val, str) and str(cat_val).isdigit()):
                 mutable_data['category_id'] = int(cat_val)
                 mutable_data.pop('category', None)
+            elif isinstance(cat_val, str):
+                slug_val = cat_val.strip().lower()
+                cat_obj = Category.objects.filter(slug__iexact=slug_val).first() or \
+                          Category.objects.filter(name__iexact=cat_val.strip()).first()
+                if not cat_obj:
+                    for choice_slug, choice_name in Listing.CATEGORY_CHOICES:
+                        if slug_val in (choice_slug, choice_name.lower()):
+                            cat_obj, _ = Category.objects.get_or_create(
+                                slug=choice_slug,
+                                defaults={'name': choice_name}
+                            )
+                            break
+                if cat_obj:
+                    mutable_data['category_id'] = cat_obj.id
+                    mutable_data.pop('category', None)
         return super().to_internal_value(mutable_data)
 
     def create(self, validated_data):
@@ -344,18 +354,41 @@ class EmailOTPVerifySerializer(EmailOTPRequestSerializer):
     otp_code = serializers.RegexField(regex=r'^\d{6}$')
 
 
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(validators=[CAMPUS_EMAIL_VALIDATOR])
+
+    def validate_email(self, value):
+        return value.strip().lower()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    email = serializers.EmailField(validators=[CAMPUS_EMAIL_VALIDATOR])
+    code = serializers.RegexField(regex=r'^\d{6}$')
+    new_password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate_email(self, value):
+        return value.strip().lower()
+
+
 class RatingSerializer(serializers.ModelSerializer):
     rater = UserPublicSerializer(read_only=True)
     rated_user = UserPublicSerializer(read_only=True)
     conversation_id = serializers.IntegerField(source='conversation.id', read_only=True)
+    rating = serializers.IntegerField(source='score', required=False)
 
     class Meta:
         model = Rating
         fields = [
-            'id', 'conversation_id', 'rater', 'rated_user', 'score', 'comment',
+            'id', 'conversation_id', 'rater', 'rated_user', 'score', 'rating', 'comment',
             'created_at',
         ]
         read_only_fields = ['id', 'conversation_id', 'rater', 'rated_user', 'created_at']
+
+    def to_internal_value(self, data):
+        mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
+        if 'rating' in mutable_data and 'score' not in mutable_data:
+            mutable_data['score'] = mutable_data['rating']
+        return super().to_internal_value(mutable_data)
 
     def validate_score(self, value):
         if not 1 <= value <= 5:
@@ -364,26 +397,50 @@ class RatingSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         request = self.context['request']
-        conversation_id = request.data.get('conversation')
-        try:
-            conversation = Conversation.objects.select_related('listing').get(
-                pk=int(conversation_id)
-            )
-        except (Conversation.DoesNotExist, TypeError, ValueError):
+        conversation_id = request.data.get('conversation') or request.data.get('conversation_id')
+        listing_id = request.data.get('listing') or request.data.get('listing_id')
+
+        conversation = None
+        if conversation_id:
+            try:
+                conversation = Conversation.objects.select_related('listing', 'buyer', 'seller').get(
+                    pk=int(conversation_id)
+                )
+            except (Conversation.DoesNotExist, TypeError, ValueError):
+                raise serializers.ValidationError({'conversation': 'A valid conversation is required.'})
+        elif listing_id:
+            try:
+                listing = Listing.objects.select_related('seller').get(pk=int(listing_id))
+                conversation = Conversation.objects.filter(listing=listing).filter(
+                    Q(buyer=request.user) | Q(seller=request.user)
+                ).first()
+                if not conversation:
+                    conversation, _ = Conversation.objects.get_or_create(
+                        listing=listing,
+                        buyer=request.user,
+                        defaults={'seller': listing.seller}
+                    )
+            except (Listing.DoesNotExist, TypeError, ValueError):
+                raise serializers.ValidationError({'listing': 'A valid listing is required.'})
+
+        if not conversation:
             raise serializers.ValidationError({'conversation': 'A valid conversation is required.'})
 
-        if request.user not in (conversation.buyer, conversation.seller):
-            raise serializers.ValidationError(
-                {'conversation': 'Only conversation participants can leave a review.'}
-            )
         if conversation.listing.status != Listing.Status.SOLD:
             raise serializers.ValidationError(
-                {'conversation': 'A review can be left after the listing is sold.'}
+                {'conversation': 'A seller can be rated after the listing is marked sold.'}
             )
+
+        if request.user != conversation.buyer:
+            raise serializers.ValidationError(
+                {'conversation': 'Only the buyer can rate the seller.'}
+            )
+
         if Rating.objects.filter(conversation=conversation, rater=request.user).exists():
             raise serializers.ValidationError(
                 {'conversation': 'You have already reviewed this conversation.'}
             )
+
         attrs['conversation'] = conversation
         attrs['rated_user'] = (
             conversation.seller if request.user == conversation.buyer else conversation.buyer
@@ -391,7 +448,17 @@ class RatingSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        return Rating.objects.create(rater=self.context['request'].user, **validated_data)
+        rater = self.context['request'].user
+        with transaction.atomic():
+            rating_obj = Rating.objects.create(rater=rater, **validated_data)
+            Review.objects.create(
+                buyer=rating_obj.rater,
+                seller=rating_obj.rated_user,
+                listing=rating_obj.conversation.listing,
+                rating=rating_obj.score,
+                comment=rating_obj.comment,
+            )
+        return rating_obj
 
 
 class NotificationSerializer(serializers.ModelSerializer):

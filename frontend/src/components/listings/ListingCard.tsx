@@ -3,7 +3,7 @@ import { type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Heart, ShieldCheck } from 'lucide-react';
-import type { Item, ListingCondition } from '../../types/market';
+import type { Item } from '../../types/market';
 import { Apple3DCard } from '../common/Apple3DCard';
 import { useAuth } from '../../context/AuthContext';
 import { useMarket } from '../../context/MarketContext';
@@ -15,26 +15,34 @@ interface ListingCardProps {
   item: Item;
 }
 
-const CONDITION_STYLES: Record<ListingCondition, string> = {
+const CONDITION_STYLES: Record<string, string> = {
   'Brand New': 'bg-[#1AA260] text-white border-[#15824d]',
   'Like New': 'bg-[#2F6FED] text-white border-[#2358c2]',
   Good: 'bg-[#2F6FED] text-white border-[#2358c2]',
   'Fair Use': 'bg-[#E0912B] text-white border-[#b8731d]',
+  Fair: 'bg-[#E0912B] text-white border-[#b8731d]',
   'Books & Notes': 'bg-[#7C5CE7] text-white border-[#6242c7]',
+  Used: 'bg-[#7C5CE7] text-white border-[#6242c7]',
   new: 'bg-[#1AA260] text-white border-[#15824d]',
+  like_new: 'bg-[#2F6FED] text-white border-[#2358c2]',
   good: 'bg-[#2F6FED] text-white border-[#2358c2]',
   fair: 'bg-[#E0912B] text-white border-[#b8731d]',
+  used: 'bg-[#7C5CE7] text-white border-[#6242c7]',
 };
 
-const CONDITION_LABEL: Record<ListingCondition, string> = {
-  'Brand New': 'Brand New',
+const CONDITION_LABEL: Record<string, string> = {
+  'Brand New': 'New',
   'Like New': 'Like New',
   Good: 'Good',
-  'Fair Use': 'Fair Use',
-  'Books & Notes': 'Books & Notes',
-  new: 'Brand New',
+  'Fair Use': 'Fair',
+  Fair: 'Fair',
+  'Books & Notes': 'Used',
+  Used: 'Used',
+  new: 'New',
+  like_new: 'Like New',
   good: 'Good',
-  fair: 'Fair Use',
+  fair: 'Fair',
+  used: 'Used',
 };
 
 export default function ListingCard({ item }: ListingCardProps) {
@@ -113,7 +121,7 @@ export default function ListingCard({ item }: ListingCardProps) {
                 src={coverImage}
                 alt={item.Title}
                 loading="lazy"
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                className="h-full w-full object-contain bg-slate-900/60 rounded-t-3xl transition-transform duration-500 group-hover:scale-[1.02]"
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-sm text-ink-muted">
